@@ -1,0 +1,43 @@
+{
+  "tool": "far_tasks",
+  "arguments": {
+    "action": "add",
+    "tasks": [
+      {
+        "id": "AUDIT_PARSER",
+        "title": "Audit parser bounds",
+        "kind": "audit",
+        "risk": "low",
+        "readPaths": [
+          "src/parser.js"
+        ],
+        "instructions": "Read actual parser contracts, edge cases and failure paths; return concrete evidence and findings. No product edits."
+      },
+      {
+        "id": "AUDIT_STORAGE",
+        "title": "Audit storage lifecycle",
+        "kind": "audit",
+        "risk": "medium",
+        "readPaths": [
+          "src/storage.js"
+        ],
+        "instructions": "Review actual lifecycle, recovery and error handling. No product edits."
+      },
+      {
+        "id": "REVIEW_BOUNDARIES",
+        "title": "Reconcile parser/storage contracts",
+        "kind": "review",
+        "risk": "medium",
+        "readPaths": [
+          "src/parser.js",
+          "src/storage.js"
+        ],
+        "dependsOn": [
+          "AUDIT_PARSER",
+          "AUDIT_STORAGE"
+        ],
+        "instructions": "Independently reconcile the actual returned audit findings and cross-module contracts. No product edits."
+      }
+    ]
+  }
+}

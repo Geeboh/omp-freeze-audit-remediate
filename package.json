@@ -1,0 +1,13 @@
+{
+  "name": "omp-freeze-audit-remediate",
+  "version": "1.0.0",
+  "description": "Parallel-first, evidence-driven feature freeze, repository audit, bug remediation and automated release verification for Oh My Pi.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {"node": ">=20"},
+  "keywords": ["omp-plugin", "oh-my-pi", "feature-freeze", "audit", "remediation", "parallel-agents"],
+  "bin": {"omp-far": "./bin/far.mjs"},
+  "scripts": {"test": "node --test tests/*.test.mjs", "check": "node scripts/check-package.mjs"},
+  "files": ["src", "bin", "skills", "agents", "docs", "configs", "examples", "scripts", "tests", "README.md", "CHANGELOG.md", "LICENSE", "MANIFEST.sha256"],
+  "omp": {"extensions": ["./src/index.js"]}
+}

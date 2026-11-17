@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { fixture } from './helpers.mjs';
+import { conflicts, makeTask, tier, agentFor } from '../src/scheduler.mjs';
+const job = (title, extra = {}) => ({ title, instructions: 'Inspect assigned code and return evidence', kind: 'audit', readPaths: [`src/${title}`], ...extra });
+test('independent audits are leased in parallel', async t => { const { engine } = await fixture(t); await engine.start({ parallel: 4 }); await engine.addTasks([job('a'), job('b'), job('c')]); const w = await engine.wave({ claim: true }); assert.equal(w.tasks.length, 3); assert.equal(new Set(w.tasks.map(t => t.lease)).size, 3); });
+test('concurrency limit includes already-running leases', async t => { const { engine } = await fixture(t); await engine.start({ parallel: 2 }); await engine.addTasks([job('a'), job('b'), job('c')]); assert.equal((await engine.wave({ claim: true })).tasks.length, 2); assert.equal((await engine.wave({ claim: true })).tasks.length, 0); });
+test('dependencies wait for prerequisite completion', async t => {
+  const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a', { id: 'A' }), job('b', { id: 'B', dependsOn: ['A'] })]);
+  const w = await engine.wave({ claim: true }); assert.deepEqual(w.tasks.map(x => x.id), ['A']);
+  await engine.settle({ id: 'A', lease: w.tasks[0].lease, outcome: 'done', summary: 'Observed fixture source reviewed' }); assert.deepEqual((await engine.wave()).map(x => x.id), ['B']);
+});
+test('cycles are rejected before recording any tasks', async t => { const { engine } = await fixture(t); await engine.start(); await assert.rejects(engine.addTasks([job('a', { id: 'A', dependsOn: ['B'] }), job('b', { id: 'B', dependsOn: ['A'] })]), /cycle/); assert.equal((await engine.state()).tasks.length, 0); });
+test('unknown dependency rejected', async t => { const { engine } = await fixture(t); await engine.start(); await assert.rejects(engine.addTasks([job('a', { dependsOn: ['unknown'] })]), /Unknown dependency/); });
+test('only one shared-worktree writer may run', async t => { const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a', { kind: 'fix', writePaths: ['src/a'] }), job('b', { kind: 'fix', writePaths: ['src/b'] })]); assert.equal((await engine.wave({ isolation: false })).length, 1); });
+test('isolated nonoverlapping fixes may run together', async t => { const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a', { kind: 'fix', writePaths: ['src/a'] }), job('b', { kind: 'fix', writePaths: ['src/b'] })]); const w = await engine.wave({ claim: true, isolation: true }); assert.equal(w.tasks.length, 2); assert(w.tasks.every(t => t.isolated)); });
+test('overlapping isolated fixes still serialize', async t => { const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a', { kind: 'fix', writePaths: ['src/common'] }), job('b', { kind: 'fix', writePaths: ['src/common/x.js'] })]); assert.equal((await engine.wave({ isolation: true })).length, 1); });
+test('shared resource labels serialize disjoint work', async t => { const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a', { resources: ['db:test'] }), job('b', { resources: ['db:test'] })]); assert.equal((await engine.wave({ isolation: true })).length, 1); });
+test('readers conflict with overlapping writes', () => { const a = makeTask(job('a', { kind: 'fix', writePaths: ['src/common'] }), 0), b = makeTask(job('b', { readPaths: ['src/common/x.js'] }), 1); assert(conflicts(a, b, true)); });
+test('audit/plan/verify do not dispatch editing tasks', async t => { const { engine } = await fixture(t); await engine.start({ mode: 'audit' }); await engine.addTasks([job('a', { kind: 'fix', writePaths: ['src/a'] })]); assert.equal((await engine.wave()).length, 0); });
+test('stale leases cannot settle another worker task', async t => { const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a')]); const w = await engine.wave({ claim: true }); await assert.rejects(engine.settle({ id: w.tasks[0].id, lease: 'wrong', outcome: 'done', summary: 'claim' }), /stale lease/); });
+test('two substantive repair failures escalate; exhaustion blocks', async t => {
+  const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a', { kind: 'fix', writePaths: ['src/a'] })]);
+  let last;
+  for (let i = 0; i < 6; i++) { const w = await engine.wave({ claim: true }); last = await engine.settle({ id: w.tasks[0].id, lease: w.tasks[0].lease, outcome: 'failed', summary: `Materially different failed attempt ${i}` }); if (i === 1) assert.equal(last.nextTier, 'standard'); if (i === 3) assert.equal(last.nextTier, 'deep'); }
+  assert.equal(last.status, 'blocked'); assert.equal((await engine.wave()).length, 0);
+});
+test('infrastructure failures block without escalating coding difficulty', async t => { const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a')]); const w = await engine.wave({ claim: true }); const r = await engine.settle({ id: w.tasks[0].id, lease: w.tasks[0].lease, outcome: 'failed', summary: 'Provider quota exhausted', infrastructure: true }); assert.equal(r.failedRepairs, 0); assert.equal(r.status, 'blocked'); });
+test('high-risk work routes directly to deep agent', () => { const t = makeTask(job('a', { kind: 'fix', risk: 'high', writePaths: ['src/a'] }), 0); assert.equal(tier(t), 'deep'); assert.equal(agentFor(t), 'far-deep-fixer'); });
+test('concurrent claims never duplicate a task', async t => { const { engine } = await fixture(t); await engine.start({ parallel: 4 }); await engine.addTasks([job('a'), job('b'), job('c')]); const waves = await Promise.all([engine.wave({ claim: true }), engine.wave({ claim: true })]); const ids = waves.flatMap(w => w.tasks.map(t => t.id)); assert.equal(ids.length, new Set(ids).size); });
+test('seeding audits is idempotence-guarded', async t => { const { engine } = await fixture(t); await engine.start(); assert((await engine.seedAudits()).length > 0); await assert.rejects(engine.seedAudits(), /already/); });
+test('write globs and whole-repository edits are rejected', () => { assert.throws(() => makeTask(job('x', { kind: 'fix', writePaths: ['src/**/*.js'] }), 0), /globs/); assert.throws(() => makeTask(job('x', { kind: 'fix', writePaths: ['.'] }), 0), /bounded/); });

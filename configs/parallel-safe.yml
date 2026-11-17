@@ -1,0 +1,14 @@
+# Optional explicit per-launch overlay; never installed into global OMP settings.
+# Verified against the documented OMP main/18.22.0 setting surface on 2026-11-17.
+# The host's limits/permissions still apply. No model IDs or credentials here.
+goal:
+  enabled: true
+task:
+  batch: true
+  maxConcurrency: 4
+  isolation:
+    enabled: true
+    apply: false
+    merge: patch
+# Capture independent patches; the coordinator reviews and integrates them serially.
+# Omit the overlay when the installed OMP version does not support these settings.

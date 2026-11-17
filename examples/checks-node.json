@@ -1,0 +1,17 @@
+{
+  "tool": "far_checks",
+  "arguments": {
+    "action": "add",
+    "check": {
+      "id": "unit",
+      "title": "Existing npm test script - confirm this repository uses npm",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "category": "tests",
+      "required": true,
+      "timeoutMs": 120000
+    }
+  }
+}

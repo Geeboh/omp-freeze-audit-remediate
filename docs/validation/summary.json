@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-17",
+  "package": "omp-freeze-audit-remediate",
+  "version": "1.0.0",
+  "node": "22.16.0",
+  "git": "2.47.3",
+  "platform": "linux-x64",
+  "localSuite": {
+    "tests": 96,
+    "pass": 96,
+    "fail": 0,
+    "skipped": 0
+  },
+  "installerChecks": {
+    "tests": 12,
+    "pass": 12,
+    "fail": 0
+  },
+  "advertisedCapabilities": {
+    "tools": 8,
+    "agents": 7,
+    "skills": 1,
+    "slashCommands": [
+      "far"
+    ]
+  },
+  "liveOmpHost": "NOT_RUN",
+  "bunRuntime": "NOT_RUN",
+  "realModelCalls": "NOT_RUN",
+  "targetRepositoryRemediation": "NOT_RUN",
+  "windowsMacOS": "NOT_RUN"
+}

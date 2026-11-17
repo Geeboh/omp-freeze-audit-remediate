@@ -1,0 +1,586 @@
+TAP version 13
+# Subtest: manifest adapter registers eight discoverable tools and /far
+ok 1 - manifest adapter registers eight discoverable tools and /far
+  ---
+  duration_ms: 48.884224
+  type: 'test'
+  ...
+# Subtest: session notice advertises command, skill and entry tool
+ok 2 - session notice advertises command, skill and entry tool
+  ---
+  duration_ms: 44.617783
+  type: 'test'
+  ...
+# Subtest: full slash command enters native goal, initializes and sends an agent-attributed prompt
+ok 3 - full slash command enters native goal, initializes and sends an agent-attributed prompt
+  ---
+  duration_ms: 66.511406
+  type: 'test'
+  ...
+# Subtest: unrelated active goal is not overwritten
+ok 4 - unrelated active goal is not overwritten
+  ---
+  duration_ms: 31.426227
+  type: 'test'
+  ...
+# Subtest: missing goal API does not pretend continuous mode started
+ok 5 - missing goal API does not pretend continuous mode started
+  ---
+  duration_ms: 33.146839
+  type: 'test'
+  ...
+# Subtest: explicit --no-goal runs as one ordinary turn
+ok 6 - explicit --no-goal runs as one ordinary turn
+  ---
+  duration_ms: 53.078425
+  type: 'test'
+  ...
+# Subtest: subagent cannot mutate coordinator ledger
+ok 7 - subagent cannot mutate coordinator ledger
+  ---
+  duration_ms: 72.747851
+  type: 'test'
+  ...
+# Subtest: FAR help works outside a repository without initializing state
+ok 8 - FAR help works outside a repository without initializing state
+  ---
+  duration_ms: 0.574039
+  type: 'test'
+  ...
+# Subtest: active workflow context is injected without replacing system policy
+ok 9 - active workflow context is injected without replacing system policy
+  ---
+  duration_ms: 62.031049
+  type: 'test'
+  ...
+# Subtest: workers do not get a new global FAR goal from context hook
+ok 10 - workers do not get a new global FAR goal from context hook
+  ---
+  duration_ms: 55.457786
+  type: 'test'
+  ...
+# Subtest: current-model mode pins actual parent selector only for FAR agents
+ok 11 - current-model mode pins actual parent selector only for FAR agents
+  ---
+  duration_ms: 66.662925
+  type: 'test'
+  ...
+# Subtest: auto routing preserves resolved native model overrides
+ok 12 - auto routing preserves resolved native model overrides
+  ---
+  duration_ms: 49.081505
+  type: 'test'
+  ...
+# Subtest: unknown model route falls back honestly to available parent
+ok 13 - unknown model route falls back honestly to available parent
+  ---
+  duration_ms: 53.07894
+  type: 'test'
+  ...
+# Subtest: tool approval tiers distinguish exec, writes and reads
+ok 14 - tool approval tiers distinguish exec, writes and reads
+  ---
+  duration_ms: 37.781481
+  type: 'test'
+  ...
+# Subtest: usage records only observed native task metadata and deduplicates within session
+ok 15 - usage records only observed native task metadata and deduplicates within session
+  ---
+  duration_ms: 73.848498
+  type: 'test'
+  ...
+# Subtest: no tool_result middleware is installed to impede speculative launches
+ok 16 - no tool_result middleware is installed to impede speculative launches
+  ---
+  duration_ms: 32.063573
+  type: 'test'
+  ...
+# Subtest: command parser rejects invalid flags and limits
+ok 17 - command parser rejects invalid flags and limits
+  ---
+  duration_ms: 0.404407
+  type: 'test'
+  ...
+# Subtest: launch uses native goal/yolo/no-prewalk without incompatible prompt attachments
+ok 18 - launch uses native goal/yolo/no-prewalk without incompatible prompt attachments
+  ---
+  duration_ms: 0.232533
+  type: 'test'
+  ...
+# Subtest: native goal refusal leaves a paused resumable ledger and no work prompt
+ok 19 - native goal refusal leaves a paused resumable ledger and no work prompt
+  ---
+  duration_ms: 47.395909
+  type: 'test'
+  ...
+# Subtest: host prompt rejection pauses the ledger instead of claiming an active run
+ok 20 - host prompt rejection pauses the ledger instead of claiming an active run
+  ---
+  duration_ms: 53.272211
+  type: 'test'
+  ...
+# Subtest: CLI initialization, inventory and status use actual filesystem state
+ok 21 - CLI initialization, inventory and status use actual filesystem state
+  ---
+  duration_ms: 338.087277
+  type: 'test'
+  ...
+# Subtest: CLI launch dry run creates neither ledger nor actual overlay
+ok 22 - CLI launch dry run creates neither ledger nor actual overlay
+  ---
+  duration_ms: 98.553303
+  type: 'test'
+  ...
+# Subtest: launcher passes settings through a stub process and removes temporary overlay
+ok 23 - launcher passes settings through a stub process and removes temporary overlay
+  ---
+  duration_ms: 168.329249
+  type: 'test'
+  ...
+# Subtest: CLI request uses engine validation and preserves exit errors
+ok 24 - CLI request uses engine validation and preserves exit errors
+  ---
+  duration_ms: 392.030038
+  type: 'test'
+  ...
+# Subtest: cross-process finding writes preserve both records
+ok 25 - cross-process finding writes preserve both records
+  ---
+  duration_ms: 132.956177
+  type: 'test'
+  ...
+# Subtest: real regression fixture records red, corrected green, and a complete qualified gate
+ok 26 - real regression fixture records red, corrected green, and a complete qualified gate
+  ---
+  duration_ms: 481.081745
+  type: 'test'
+  ...
+# Subtest: test execution tasks have a diagnostics-capable agent and no product writes
+ok 27 - test execution tasks have a diagnostics-capable agent and no product writes
+  ---
+  duration_ms: 0.60435
+  type: 'test'
+  ...
+# Subtest: temporary overlay validates concurrency and never embeds model credentials
+ok 28 - temporary overlay validates concurrency and never embeds model credentials
+  ---
+  duration_ms: 0.132164
+  type: 'test'
+  ...
+# Subtest: runner removes inherited Node harness marker without changing parent environment
+ok 29 - runner removes inherited Node harness marker without changing parent environment
+  ---
+  duration_ms: 0.376225
+  type: 'test'
+  ...
+# Subtest: initialization is durable and idempotent; .far is excluded
+ok 30 - initialization is durable and idempotent; .far is excluded
+  ---
+  duration_ms: 85.945055
+  type: 'test'
+  ...
+# Subtest: mode switch preserves findings and requires a reason
+ok 31 - mode switch preserves findings and requires a reason
+  ---
+  duration_ms: 62.844591
+  type: 'test'
+  ...
+# Subtest: enumeration cannot satisfy review coverage
+ok 32 - enumeration cannot satisfy review coverage
+  ---
+  duration_ms: 67.349871
+  type: 'test'
+  ...
+# Subtest: source content edit invalidates recorded review
+ok 33 - source content edit invalidates recorded review
+  ---
+  duration_ms: 109.724388
+  type: 'test'
+  ...
+# Subtest: new nonignored files are included; ignored cache is not
+ok 34 - new nonignored files are included; ignored cache is not
+  ---
+  duration_ms: 80.590518
+  type: 'test'
+  ...
+# Subtest: deleted tracked files remain explicit in scope
+ok 35 - deleted tracked files remain explicit in scope
+  ---
+  duration_ms: 67.101634
+  type: 'test'
+  ...
+# Subtest: coverage cannot record paths absent from inventory
+ok 36 - coverage cannot record paths absent from inventory
+  ---
+  duration_ms: 61.965271
+  type: 'test'
+  ...
+# Subtest: unsafe relative paths rejected
+ok 37 - unsafe relative paths rejected
+  ---
+  duration_ms: 0.601629
+  type: 'test'
+  ...
+# Subtest: symlinked state directory is refused
+ok 38 - symlinked state directory is refused
+  ---
+  duration_ms: 30.852438
+  type: 'test'
+  ...
+# Subtest: source symlink is inventoried without following its target
+ok 39 - source symlink is inventoried without following its target
+  ---
+  duration_ms: 75.460501
+  type: 'test'
+  ...
+# Subtest: parallel state writers do not lose findings
+ok 40 - parallel state writers do not lose findings
+  ---
+  duration_ms: 346.00221
+  type: 'test'
+  ...
+# Subtest: high-severity findings cannot be deferred
+ok 41 - high-severity findings cannot be deferred
+  ---
+  duration_ms: 55.278458
+  type: 'test'
+  ...
+# Subtest: a verified fix requires executed evidence, not a claim
+ok 42 - a verified fix requires executed evidence, not a claim
+  ---
+  duration_ms: 41.862492
+  type: 'test'
+  ...
+# Subtest: same reviewer and implementer rejected
+ok 43 - same reviewer and implementer rejected
+  ---
+  duration_ms: 38.150508
+  type: 'test'
+  ...
+# Subtest: finish fails on empty required verification contract
+ok 44 - finish fails on empty required verification contract
+  ---
+  duration_ms: 55.253332
+  type: 'test'
+  ...
+# Subtest: audit mode completes without claiming release readiness
+ok 45 - audit mode completes without claiming release readiness
+  ---
+  duration_ms: 62.988916
+  type: 'test'
+  ...
+# Subtest: plan mode completes with a sealed plan, without running product tests
+ok 46 - plan mode completes with a sealed plan, without running product tests
+  ---
+  duration_ms: 66.927619
+  type: 'test'
+  ...
+# Subtest: full workflow produces READY only after all stages and review
+ok 47 - full workflow produces READY only after all stages and review
+  ---
+  duration_ms: 128.856068
+  type: 'test'
+  ...
+# Subtest: full completion fails after source changes
+ok 48 - full completion fails after source changes
+  ---
+  duration_ms: 148.875253
+  type: 'test'
+  ...
+# Subtest: missing mandatory result is not conditionally ready
+ok 49 - missing mandatory result is not conditionally ready
+  ---
+  duration_ms: 51.686758
+  type: 'test'
+  ...
+# Subtest: sealed check changes require an explicit rationale and reseal
+ok 50 - sealed check changes require an explicit rationale and reseal
+  ---
+  duration_ms: 48.862217
+  type: 'test'
+  ...
+# Subtest: prepare branch never stashes or overwrites dirty files
+ok 51 - prepare branch never stashes or overwrites dirty files
+  ---
+  duration_ms: 56.652468
+  type: 'test'
+  ...
+# Subtest: prepare branch creates a clean dedicated branch without commits
+ok 52 - prepare branch creates a clean dedicated branch without commits
+  ---
+  duration_ms: 72.660503
+  type: 'test'
+  ...
+# Subtest: report is derived and does not affect source fingerprint
+ok 53 - report is derived and does not affect source fingerprint
+  ---
+  duration_ms: 62.930206
+  type: 'test'
+  ...
+# Subtest: pause prevents new mutating work; resume restores continuation
+ok 54 - pause prevents new mutating work; resume restores continuation
+  ---
+  duration_ms: 91.620358
+  type: 'test'
+  ...
+# Subtest: redactor masks common secrets without claiming exhaustive removal
+ok 55 - redactor masks common secrets without claiming exhaustive removal
+  ---
+  duration_ms: 0.1968
+  type: 'test'
+  ...
+# Subtest: subdirectory input resolves to the repository root
+ok 56 - subdirectory input resolves to the repository root
+  ---
+  duration_ms: 26.430749
+  type: 'test'
+  ...
+# Subtest: repository status remains uncommitted after initialization
+ok 57 - repository status remains uncommitted after initialization
+  ---
+  duration_ms: 48.370657
+  type: 'test'
+  ...
+# Subtest: audit cannot finish while a claimed worker is outstanding
+ok 58 - audit cannot finish while a claimed worker is outstanding
+  ---
+  duration_ms: 77.66504
+  type: 'test'
+  ...
+# Subtest: tampered evidence log blocks release readiness
+ok 59 - tampered evidence log blocks release readiness
+  ---
+  duration_ms: 126.982488
+  type: 'test'
+  ...
+# Subtest: missing evidence log blocks release readiness
+ok 60 - missing evidence log blocks release readiness
+  ---
+  duration_ms: 137.554597
+  type: 'test'
+  ...
+# Subtest: existing unrelated .far data is not overwritten
+ok 61 - existing unrelated .far data is not overwritten
+  ---
+  duration_ms: 20.614777
+  type: 'test'
+  ...
+# Subtest: executable-bit change invalidates the source review
+ok 62 - executable-bit change invalidates the source review
+  ---
+  duration_ms: 41.773134
+  type: 'test'
+  ...
+# Subtest: baseline excludes plugin-owned state noise
+ok 63 - baseline excludes plugin-owned state noise
+  ---
+  duration_ms: 34.664758
+  type: 'test'
+  ...
+# Subtest: real successful process records PASS with log/hash and exit status
+ok 64 - real successful process records PASS with log/hash and exit status
+  ---
+  duration_ms: 127.555835
+  type: 'test'
+  ...
+# Subtest: real failing process records FAIL
+ok 65 - real failing process records FAIL
+  ---
+  duration_ms: 119.673957
+  type: 'test'
+  ...
+# Subtest: timeout terminates a hung check
+ok 66 - timeout terminates a hung check
+  ---
+  duration_ms: 227.236849
+  type: 'test'
+  ...
+# Subtest: abort signal cancels without a false PASS
+ok 67 - abort signal cancels without a false PASS
+  ---
+  duration_ms: 127.886996
+  type: 'test'
+  ...
+# Subtest: already aborted command never starts
+ok 68 - already aborted command never starts
+  ---
+  duration_ms: 22.665223
+  type: 'test'
+  ...
+# Subtest: missing executable becomes a recorded failure
+ok 69 - missing executable becomes a recorded failure
+  ---
+  duration_ms: 92.385615
+  type: 'test'
+  ...
+# Subtest: output is bounded and common secrets redacted
+ok 70 - output is bounded and common secrets redacted
+  ---
+  duration_ms: 52.001842
+  type: 'test'
+  ...
+# Subtest: source mutations during a test invalidate its evidence
+ok 71 - source mutations during a test invalidate its evidence
+  ---
+  duration_ms: 90.231287
+  type: 'test'
+  ...
+# Subtest: parallel-safe commands with distinct resources form one wave
+ok 72 - parallel-safe commands with distinct resources form one wave
+  ---
+  duration_ms: 0.37353
+  type: 'test'
+  ...
+# Subtest: same check resource and unspecified safety serialize
+ok 73 - same check resource and unspecified safety serialize
+  ---
+  duration_ms: 0.259011
+  type: 'test'
+  ...
+# Subtest: parallel-safe requires an explicit resource contract
+ok 74 - parallel-safe requires an explicit resource contract
+  ---
+  duration_ms: 0.584782
+  type: 'test'
+  ...
+# Subtest: unsafe cwd and malformed argv rejected
+ok 75 - unsafe cwd and malformed argv rejected
+  ---
+  duration_ms: 0.125645
+  type: 'test'
+  ...
+# Subtest: duplicate checks in one batch rejected
+ok 76 - duplicate checks in one batch rejected
+  ---
+  duration_ms: 49.130803
+  type: 'test'
+  ...
+# Subtest: runner releases its check-batch reservation
+ok 77 - runner releases its check-batch reservation
+  ---
+  duration_ms: 104.997329
+  type: 'test'
+  ...
+# Subtest: exclusive check is a barrier; later parallel checks do not jump ahead
+ok 78 - exclusive check is a barrier; later parallel checks do not jump ahead
+  ---
+  duration_ms: 0.788241
+  type: 'test'
+  ...
+# Subtest: independent audits are leased in parallel
+ok 79 - independent audits are leased in parallel
+  ---
+  duration_ms: 85.218412
+  type: 'test'
+  ...
+# Subtest: concurrency limit includes already-running leases
+ok 80 - concurrency limit includes already-running leases
+  ---
+  duration_ms: 67.114549
+  type: 'test'
+  ...
+# Subtest: dependencies wait for prerequisite completion
+ok 81 - dependencies wait for prerequisite completion
+  ---
+  duration_ms: 57.418712
+  type: 'test'
+  ...
+# Subtest: cycles are rejected before recording any tasks
+ok 82 - cycles are rejected before recording any tasks
+  ---
+  duration_ms: 76.612845
+  type: 'test'
+  ...
+# Subtest: unknown dependency rejected
+ok 83 - unknown dependency rejected
+  ---
+  duration_ms: 44.815251
+  type: 'test'
+  ...
+# Subtest: only one shared-worktree writer may run
+ok 84 - only one shared-worktree writer may run
+  ---
+  duration_ms: 43.452668
+  type: 'test'
+  ...
+# Subtest: isolated nonoverlapping fixes may run together
+ok 85 - isolated nonoverlapping fixes may run together
+  ---
+  duration_ms: 61.287976
+  type: 'test'
+  ...
+# Subtest: overlapping isolated fixes still serialize
+ok 86 - overlapping isolated fixes still serialize
+  ---
+  duration_ms: 44.001893
+  type: 'test'
+  ...
+# Subtest: shared resource labels serialize disjoint work
+ok 87 - shared resource labels serialize disjoint work
+  ---
+  duration_ms: 35.911079
+  type: 'test'
+  ...
+# Subtest: readers conflict with overlapping writes
+ok 88 - readers conflict with overlapping writes
+  ---
+  duration_ms: 0.455521
+  type: 'test'
+  ...
+# Subtest: audit/plan/verify do not dispatch editing tasks
+ok 89 - audit/plan/verify do not dispatch editing tasks
+  ---
+  duration_ms: 37.876745
+  type: 'test'
+  ...
+# Subtest: stale leases cannot settle another worker task
+ok 90 - stale leases cannot settle another worker task
+  ---
+  duration_ms: 49.615677
+  type: 'test'
+  ...
+# Subtest: two substantive repair failures escalate; exhaustion blocks
+ok 91 - two substantive repair failures escalate; exhaustion blocks
+  ---
+  duration_ms: 71.933883
+  type: 'test'
+  ...
+# Subtest: infrastructure failures block without escalating coding difficulty
+ok 92 - infrastructure failures block without escalating coding difficulty
+  ---
+  duration_ms: 41.878941
+  type: 'test'
+  ...
+# Subtest: high-risk work routes directly to deep agent
+ok 93 - high-risk work routes directly to deep agent
+  ---
+  duration_ms: 0.346881
+  type: 'test'
+  ...
+# Subtest: concurrent claims never duplicate a task
+ok 94 - concurrent claims never duplicate a task
+  ---
+  duration_ms: 74.087286
+  type: 'test'
+  ...
+# Subtest: seeding audits is idempotence-guarded
+ok 95 - seeding audits is idempotence-guarded
+  ---
+  duration_ms: 42.48338
+  type: 'test'
+  ...
+# Subtest: write globs and whole-repository edits are rejected
+ok 96 - write globs and whole-repository edits are rejected
+  ---
+  duration_ms: 0.276578
+  type: 'test'
+  ...
+1..96
+# tests 96
+# suites 0
+# pass 96
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2578.110247
