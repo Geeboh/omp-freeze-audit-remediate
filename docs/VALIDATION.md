@@ -7,7 +7,7 @@ Validation date: **25 November 2026**. Environment: Linux x86_64, Node.js **24.2
 | Validation surface | Result | Evidence and limits |
 |---|---|---|
 | Behavioral suite | **117 passed, 0 failed, 0 skipped** | `npm test`; temporary Git repositories, subprocesses and deterministic policy/recovery fixtures |
-| Development package checks | **PASS** | `npm run check`; 115 files discovered, 28 JavaScript files syntax-checked, source manifest integrity intentionally not required |
+| Development package checks | **PASS** | Exact final commit `npm run check`; 60 tracked files discovered, 27 JavaScript files syntax-checked, source manifest integrity intentionally not required |
 | Pack integrity | **PASS** | `python3 docs/overhaul/FAR-Overhaul-Pack-v2.0.0/scripts/verify-pack.py --root docs/overhaul/FAR-Overhaul-Pack-v2.0.0`; 56 files and 79/50 contract cases |
 | Pinned source reproductions | **COLLECTED** | Three v1 gate gaps reproduced against d5bba12; safe behavior is covered by `tests/gates-regression.test.mjs` |
 | Release artifact build/installer/rollback | **PASS** | Clean committed candidate built `2.0.0-rc.1`; ZIP and installer validation passed 13 checks; migration restore passed separately; exact receipt and hashes are retained outside source |
