@@ -5,16 +5,16 @@
 Start a fresh OMP session with the package and its explicit optional parallel overlay:
 
 ```bash
-node "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0/bin/far.mjs" launch full --root /path/to/project --parallel 4 --models auto
+node "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1/bin/far.mjs" launch full --root /path/to/project --parallel 4 --models auto --profile release --escalation shelve
 ```
 
-This starts native OMP with `--extension`, `--config`, `--no-prewalk`, `--yolo` and `--goal`. The launcher creates no model connection of its own. The parent model follows the installed skill and calls the tools.
+This starts native OMP with `--extension`, `--config`, `--no-prewalk`, `--approval-mode=yolo`, and `--goal`. The launcher creates no model connection of its own. The parent model follows the installed skill and calls the tools.
 
 After linking the package, the interactive alternative is:
 
 ```bash
 cd /path/to/project
-omp --config "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0/configs/parallel-safe.yml" --no-prewalk --yolo
+omp --config "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1/configs/parallel-safe.yml" --no-prewalk --approval-mode=yolo
 ```
 
 ```text

@@ -65,7 +65,7 @@ To use native OMP session continuation:
 
 ```bash
 cd /path/to/project
-omp --continue --no-prewalk --yolo
+omp --continue --no-prewalk --approval-mode=yolo
 ```
 
 Once idle, with the plugin linked:

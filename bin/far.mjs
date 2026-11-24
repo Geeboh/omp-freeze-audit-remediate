@@ -11,7 +11,7 @@ import { HELP, objective } from '../src/workflow.mjs';
 import { MODES } from '../src/gates.mjs';
 import { requireThat } from '../src/io.mjs';
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CLI_HELP = `${HELP}\nCLI (Node.js 22+)\n  node bin/far.mjs launch full --root /repo --parallel 4 --models auto --profile release\n  node bin/far.mjs launch full --root /repo --scope src,tests --base origin/main --escalation shelve\n  node bin/far.mjs escalation status|set shelve --root /repo\n  node bin/far.mjs shelf list|show REQUEST_ID|approve REQUEST_ID|deny REQUEST_ID|retry TASK_ID --root /repo\n  node bin/far.mjs launch full --root /repo --dry-run\n  node bin/far.mjs init --mode audit --root /repo\n  node bin/far.mjs status|doctor|inventory|seed|gate|advance|finish|report --root /repo\n  node bin/far.mjs request --file request.json --root /repo\n  node bin/far.mjs prompt full\n\nlaunch opens native OMP with --goal --yolo --no-prewalk and the package's\nparallel-safe per-launch overlay. --no-overlay omits that overlay. --omp PATH selects\nthe omp executable. No project edits, dependency installs or commits occur\nuntil the launched agent takes explicitly authorized development actions.\nrequest JSON: {\"tool\":\"far_checks\",\"arguments\":{\"action\":\"list\"}}\n`;
+const CLI_HELP = `${HELP}\nCLI (Node.js 22+)\n  node bin/far.mjs launch full --root /repo --parallel 4 --models auto --profile release\n  node bin/far.mjs launch full --root /repo --scope src,tests --base origin/main --escalation shelve\n  node bin/far.mjs escalation status|set shelve --root /repo\n  node bin/far.mjs shelf list|show REQUEST_ID|approve REQUEST_ID|deny REQUEST_ID|retry TASK_ID --root /repo\n  node bin/far.mjs launch full --root /repo --dry-run\n  node bin/far.mjs init --mode audit --root /repo\n  node bin/far.mjs status|doctor|inventory|seed|gate|advance|finish|report --root /repo\n  node bin/far.mjs request --file request.json --root /repo\n  node bin/far.mjs prompt full\n\nlaunch opens native OMP with --goal --approval-mode=yolo --no-prewalk and the package's\nparallel-safe per-launch overlay. --no-overlay omits that overlay. --omp PATH selects\nthe omp executable. No project edits, dependency installs or commits occur\nuntil the launched agent takes explicitly authorized development actions.\nrequest JSON: {\"tool\":\"far_checks\",\"arguments\":{\"action\":\"list\"}}\n`;
 export function parseArgs(argv) {
   const a = [...argv], cmd = a.shift() ?? 'help';
   const out = { cmd, root: process.cwd(), mode: 'full', modelMode: 'auto', profile: 'balanced', escalationPolicy: 'shelve', scope: null, base: null, parallel: 4, omp: 'omp', overlay: true };
@@ -43,7 +43,7 @@ export function overlayText(parallel) {
   return `# FAR per-launch settings; no persistent OMP configuration changes.\ngoal:\n  enabled: true\ntask:\n  batch: true\n  maxConcurrency: ${parallel}\n  isolation:\n    enabled: true\n    apply: false\n    merge: patch\n`;
 }
 export function launchArgs(opts) {
-  return ['--extension', PACKAGE_ROOT, ...(opts.overlay ? ['--config', opts.configPath ?? path.join(PACKAGE_ROOT, 'configs/parallel-safe.yml')] : []), '--no-prewalk', '--yolo', '--goal', objective(opts.mode, opts)];
+  return ['--extension', PACKAGE_ROOT, ...(opts.overlay ? ['--config', opts.configPath ?? path.join(PACKAGE_ROOT, 'configs/parallel-safe.yml')] : []), '--no-prewalk', '--approval-mode=yolo', '--goal', objective(opts.mode, opts)];
 }
 async function main() {
   const opts = parseArgs(process.argv.slice(2));

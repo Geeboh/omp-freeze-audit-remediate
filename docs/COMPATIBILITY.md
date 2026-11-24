@@ -19,7 +19,7 @@ The package declares `omp.extensions:["./src/index.js"]`. Link the whole directo
 | Runtime registration | default factory; `registerTool`, `registerCommand`, `on`, injected `pi.zod` | Explicit initialization error, not a fake working plugin |
 | Skill/agent discovery | Package-root conventional directories | Doctor/help points to expected names; no invented API registration |
 | Native goal entry | `ctx.sessionModes.getState/set` in TUI | Explicit refusal; CLI `--goal` or intentionally bounded `--no-goal` alternative |
-| Goal launcher | `--goal`, `--yolo`, `--no-prewalk`, `--config`, `--extension` | Host CLI error is surfaced; no undocumented fallback |
+| Goal launcher | `--goal`, `--approval-mode=yolo`, `--no-prewalk`, `--config`, `--extension` | Host CLI probe observed these flags on OMP 19.1.1; other hosts must be probed before launch |
 | Parallel workers | Native `task` batch schema; optional isolation | Inspect runtime schema; one shared writer if isolation unavailable |
 | Models | `ctx.models.current/list/resolve`; `before_subagent_spawn` | Preserve operator routing; unresolved routes may use actual parent with a limitation note |
 | Usage | Passive `turn_end` native task result metadata | Unavailable telemetry remains unavailable; no invented billing figures |

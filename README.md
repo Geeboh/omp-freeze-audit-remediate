@@ -41,7 +41,7 @@ After linking, start with the supplied static four-worker overlay:
 
 ```bash
 cd /path/to/project
-omp --config "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1/configs/parallel-safe.yml" --no-prewalk --yolo
+omp --config "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1/configs/parallel-safe.yml" --no-prewalk --approval-mode=yolo
 ```
 
 Then:
