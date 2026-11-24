@@ -45,7 +45,8 @@ export async function runProcess(argv, { cwd, timeoutMs, signal, limitBytes = 10
   if (signal?.aborted) return { exitCode: null, signal: null, cancelled: true, timedOut: false, output: '', truncated: false, durationMs: 0 };
   return new Promise((resolve) => {
     const start = Date.now(); let kept = 0, truncated = false, timedOut = false, cancelled = false, error, chunks = [];
-    const child = spawn(argv[0], argv.slice(1), { cwd, shell: false, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: childEnvironment() });
+    const effectiveArgv = process.versions.bun && argv[0] === process.execPath && argv[1] === '--test' ? [argv[0], 'test', ...argv.slice(2)] : argv;
+    const child = spawn(effectiveArgv[0], effectiveArgv.slice(1), { cwd, shell: false, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: childEnvironment() });
     let killTimer;
     const kill = (sig) => {
       try { if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, sig); else child.kill(sig); } catch (e) { if (e.code !== 'ESRCH') error ??= e.message; }

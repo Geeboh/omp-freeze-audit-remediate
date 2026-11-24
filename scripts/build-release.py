@@ -50,6 +50,10 @@ def allowlisted_files() -> list[Path]:
 def build(output: Path) -> dict:
     pkg = metadata()
     name, version = pkg["name"], pkg["version"]
+    bun_constraint = pkg.get("engines", {}).get("bun", "")
+    if not bun_constraint.startswith(">="):
+        raise ValueError("package.json must declare a Bun minimum engine")
+    bun_version = bun_constraint[2:]
     base = f"{name}-{version}"
     output = output.resolve()
     if output == ROOT or ROOT in output.parents:
@@ -84,9 +88,9 @@ def build(output: Path) -> dict:
             z.writestr(info, base64.b64decode(entry["data"]))
     payload = base64.b64encode(gzip.compress(json.dumps(entries, separators=(",", ":")).encode(), mtime=0)).decode()
     template = (ROOT / "scripts/installer-template.mjs").read_text()
-    if template.count("'__FAR_EMBEDDED_PAYLOAD__'") != 1 or template.count("'__FAR_PACKAGE_NAME__'") != 1:
+    if template.count("'__FAR_EMBEDDED_PAYLOAD__'") != 1 or template.count("'__FAR_PACKAGE_NAME__'") != 1 or template.count("'__FAR_BUN_VERSION__'") != 1:
         raise ValueError("Installer payload or package sentinel mismatch")
-    installer.write_text(template.replace("'__FAR_EMBEDDED_PAYLOAD__'", json.dumps(payload)).replace("'__FAR_PACKAGE_NAME__'", json.dumps(base)))
+    installer.write_text(template.replace("'__FAR_EMBEDDED_PAYLOAD__'", json.dumps(payload)).replace("'__FAR_PACKAGE_NAME__'", json.dumps(base)).replace("'__FAR_BUN_VERSION__'", json.dumps(bun_version)))
     installer.chmod(0o755)
     sums.write_text("".join(f"{digest(path.read_bytes())}  {path.name}\n" for path in [archive, installer]))
     receipt_data = {"schemaVersion": 1, "product": name, "version": version, "sourceCommit": source_commit, "artifacts": [{"file": p.name, "sha256": digest(p.read_bytes())} for p in [archive, installer]], "manifestSha256": digest(manifest_data), "publication": "NOT_PUBLISHED"}

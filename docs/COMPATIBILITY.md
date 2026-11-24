@@ -4,7 +4,7 @@
 
 The overhaul candidate is `2.0.0-rc.1`. The implementation retains the ESM adapter, five modes, eight tools and atomic JSON state. Live capability claims remain separate from deterministic engine evidence.
 
-Local validation used Node.js **24.22.3**, Git **2.43.0**, OMP **19.1.1** and Linux x86_64. Bun is absent. The OMP executable and CLI help are available, but this worktree has not been linked into a fresh OMP session; extension loading, native task execution, trusted approval origin, exact route enforcement and provider calls remain **NOT RUN**.
+Local validation used Node.js **24.22.3**, Bun **1.4.5**, Git **2.43.0**, OMP **19.1.1** and Linux x86_64. The installer now provisions Bun 1.4.5+ when absent. Bun ran all 117 tests successfully after the runtime-command normalization. The OMP executable and CLI help are available; extension load and provider smoke are qualified separately, while trusted approval origin, exact route enforcement and non-Linux behavior remain unqualified.
 
 ## Discovery contract
 

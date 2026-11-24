@@ -8,7 +8,7 @@ An executable Oh My Pi extension for feature freeze, repository-wide audit, bug 
 
 ## Install once
 
-Requires an existing OMP installation, Node.js 22+ and Git. No third-party Node runtime dependencies, API keys or separate MCP service are required by the plugin. Model calls still need your working OMP provider configuration.
+Requires an existing OMP installation, Node.js 22+, Bun 1.4.5+ and Git. The generated installer installs Bun when missing. Model calls still need your working OMP provider configuration.
 
 From the directory containing the distributed single-file installer:
 
@@ -18,7 +18,7 @@ node ./omp-freeze-audit-remediate-2.0.0-rc.1-install.mjs \
 omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1"
 ```
 
-The installer verifies the embedded files, refuses an existing destination, performs no downloads and does not change OMP configuration. `omp plugin link` is the explicit separate registration step. Keep the installed directory in place. Start a **new OMP session** to load it.
+The installer verifies embedded files, installs or reuses Bun 1.4.5+, refuses an existing destination, and does not change OMP configuration. Missing-Bun installation needs network access and Linux/macOS `unzip`. `omp plugin link` is the explicit separate registration step. Keep the installed directory in place. Start a **new OMP session** to load it.
 The release builder uses `package.json` identity and a tracked allowlist. It writes manifests and receipts only to the output directory. Development checks do not require the source manifest to be current.
 
 Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-2.0.0-rc.1` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.

@@ -27,6 +27,7 @@ try {
  const zipEntries=JSON.parse((await runCommand('python3',['-c','import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); print(json.dumps(sorted(z.namelist())))',packageZip])).stdout);
  assert(zipEntries.length>0 && zipEntries.every(name=>name.startsWith(path.basename(packageZip,'.zip')+'/'))); pass('generated ZIP is readable and path-contained');
  const check=JSON.parse((await run(path.join(dest,'scripts/check-package.mjs'),['--artifact'])).stdout); assert.equal(check.problems.length,0); assert.equal(check.artifactMode,true); assert(check.tools>0 && check.agents>0); pass('extracted package discovery metadata, local links, syntax and exact manifest checks');
+ const bunVersion=(await runCommand('bun',['--version'])).stdout.trim(); assert.match(bunVersion,/^\d+\.\d+\.\d+$/); pass(`Bun prerequisite available (${bunVersion})`);
  const help=await run(path.join(dest,'bin/far.mjs'),['help']); assert.match(help.stdout,/Freeze Audit Remediate/); pass('installed standalone CLI help');
  const mod=await exec(process.execPath,['--input-type=module','-e',`const m=await import(${JSON.stringify('file://'+path.join(dest,'src/index.js'))}); if(typeof m.default!=='function') process.exit(1);`]); pass('installed ESM entry imports without third-party dependencies');
  await fs.writeFile(path.join(dest,'preserve-me.txt'),'user-change');

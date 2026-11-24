@@ -39,8 +39,9 @@ for(const file of files.filter(f=>f.endsWith('.md'))) {
   try { await fs.access(dest); } catch { problems.push(`Broken local link: ${path.relative(root,file)} -> ${link}`); }
  }
 }
+const syntaxRuntime=process.versions.bun ? 'node' : process.execPath;
 let syntaxCount=0;
-for(const f of files.filter(f=>/\.(mjs|js)$/.test(f))) { try { await run(process.execPath,['--check',f]); syntaxCount++; } catch(e) { problems.push(`Syntax: ${f}: ${e.stderr}`); } }
+for(const f of files.filter(f=>/\.(mjs|js)$/.test(f))) { try { await run(syntaxRuntime,['--check',f]); syntaxCount++; } catch(e) { problems.push(`Syntax: ${f}: ${e.stderr}`); } }
 let integrityCount=0, manifestFiles=0;
 if (artifactMode) {
  const manifest=path.join(root,'MANIFEST.sha256');
