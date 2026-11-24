@@ -6,8 +6,10 @@ import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 export const execFileAsync = promisify(execFile);
-export const VERSION = '1.0.0';
+export const VERSION = require('../package.json').version;
 export const STATE_DIR = '.far';
 export const now = () => new Date().toISOString();
 export const hash = value => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
@@ -49,8 +51,16 @@ export async function fileHash(file) {
   for await (const chunk of createReadStream(file)) h.update(chunk);
   return h.digest('hex');
 }
-export async function snapshot(root, maxFiles = 50000) {
-  const names = [...new Set((await git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])).split('\0').filter(Boolean))].sort();
+function pathInScope(name, scope) {
+  if (!scope || scope.unknownDependencies === true) return true;
+  const include = scope.include?.length ? scope.include : ['.'];
+  const excluded = scope.exclude ?? [];
+  const matches = prefix => prefix === '.' || name === prefix || name.startsWith(`${prefix}/`);
+  return include.some(matches) && !excluded.some(matches);
+}
+export async function snapshot(root, maxFiles = 50000, scope) {
+  const names = [...new Set((await git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])).split('\0').filter(Boolean))]
+    .filter(name => pathInScope(name, scope)).sort();
   requireThat(names.length <= maxFiles, `Repository inventory exceeds ${maxFiles} files; deliberately revise the limit/scope before proceeding`, 'SCOPE_LIMIT');
   const files = [];
   // Git controls enumeration; do not traverse symlinks, ignored caches, or submodules.
@@ -85,11 +95,33 @@ export async function ensureStateDir(root) {
   await noSymlinks(root, STATE_DIR);
   await fs.mkdir(path.join(root, STATE_DIR), { recursive: true, mode: 0o700 });
 }
+export async function migrateState(value, root) {
+  requireThat(value?.schemaVersion === 1, 'Only FAR schema version 1 can be migrated', 'MIGRATION_UNSUPPORTED');
+  const { normalizePolicy, emptyBudget } = await import('./policy.mjs');
+  const policy = normalizePolicy();
+  return {
+    ...value,
+    schemaVersion: 2,
+    root,
+    lifecycle: value.status === 'complete' ? 'closed' : value.status,
+    outcome: value.status === 'complete' ? 'COMPLETE' : null,
+    pauseReason: null,
+    options: { ...value.options, profile: policy.profile, policy },
+    escalationRequests: [],
+    approvalGrants: [],
+    budget: emptyBudget(policy),
+    dispatch: { intents: [], workers: [] },
+    idempotency: {},
+    progress: { waves: 0, noProgressWaves: 0, history: [], lastFingerprint: null },
+    plan: { revision: 0, entries: [] },
+  };
+}
 export async function readState(root, required = true) {
   await noSymlinks(root, `${STATE_DIR}/state.json`);
   try {
-    const s = JSON.parse(await fs.readFile(path.join(root, STATE_DIR, 'state.json'), 'utf8'));
-    requireThat(s.schemaVersion === 1 && Array.isArray(s.tasks) && Array.isArray(s.findings) && Array.isArray(s.runs) && s.root === root, 'Unsupported, relocated or damaged FAR state; preserve it and inspect before recovery', 'STATE_INVALID');
+    let s = JSON.parse(await fs.readFile(path.join(root, STATE_DIR, 'state.json'), 'utf8'));
+    requireThat((s.schemaVersion === 1 || s.schemaVersion === 2) && Array.isArray(s.tasks) && Array.isArray(s.findings) && Array.isArray(s.runs) && s.root === root, 'Unsupported, relocated or damaged FAR state; preserve it and inspect before recovery', 'STATE_INVALID');
+    if (s.schemaVersion === 1) s = await migrateState(s, root);
     requireThat(['audit', 'plan', 'remediate', 'verify', 'full'].includes(s.mode) && ['active', 'paused', 'blocked', 'complete'].includes(s.status) && ['feature-freeze', 'code-freeze', 'release-candidate'].includes(s.stage) && Number.isInteger(s.revision) && s.options && Number.isInteger(s.options.parallel) && s.options.parallel >= 1 && s.options.parallel <= 32 && ['auto', 'current'].includes(s.options.modelMode) && s.coverage && s.contract && Array.isArray(s.checks) && Array.isArray(s.reviews), 'Invalid FAR ledger fields; preserve state and investigate', 'STATE_INVALID');
     return s;
   } catch (e) { if (e.code === 'ENOENT' && !required) return null; throw e; }

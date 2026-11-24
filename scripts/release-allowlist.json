@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "paths": [
+    "src",
+    "bin",
+    "skills",
+    "agents",
+    "docs",
+    "configs",
+    "examples",
+    "scripts",
+    "tests",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "package.json",
+    "MANIFEST.sha256"
+  ],
+  "required": [
+    "package.json",
+    "src/index.js",
+    "bin/far.mjs",
+    "skills/freeze-audit-remediate/SKILL.md",
+    "MANIFEST.sha256"
+  ]
+}

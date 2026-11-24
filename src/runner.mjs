@@ -18,7 +18,9 @@ export function checkSpec(input) {
   const resources = (input.resources ?? ['*']).map(x => text(x, 'resource', 200));
   const parallelSafe = input.parallelSafe === true;
   requireThat(!parallelSafe || resources.length > 0 && !resources.includes('*'), 'Parallel-safe checks need explicit resource labels; use a distinct temp DB/build dir/port as appropriate');
-  const spec = { id, title: text(input.title ?? id, 'check title', 500), argv, cwd, timeoutMs, category, required: input.required !== false, parallelSafe, resources };
+  const contextKey = input.contextKey ?? 'default';
+  requireThat(typeof contextKey === 'string' && contextKey.length > 0 && contextKey.length <= 200, 'Invalid check context');
+  const spec = { id, title: text(input.title ?? id, 'check title', 500), argv, cwd, contextKey, timeoutMs, category, required: input.required !== false, parallelSafe, resources };
   return { ...spec, specHash: hash(spec) };
 }
 export function checkWaves(checks, parallel) {
@@ -43,7 +45,8 @@ export async function runProcess(argv, { cwd, timeoutMs, signal, limitBytes = 10
   if (signal?.aborted) return { exitCode: null, signal: null, cancelled: true, timedOut: false, output: '', truncated: false, durationMs: 0 };
   return new Promise((resolve) => {
     const start = Date.now(); let kept = 0, truncated = false, timedOut = false, cancelled = false, error, chunks = [];
-    const child = spawn(argv[0], argv.slice(1), { cwd, shell: false, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: childEnvironment() });
+    const effectiveArgv = process.versions.bun && argv[0] === process.execPath && argv[1] === '--test' ? [argv[0], 'test', ...argv.slice(2)] : argv;
+    const child = spawn(effectiveArgv[0], effectiveArgv.slice(1), { cwd, shell: false, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: childEnvironment() });
     let killTimer;
     const kill = (sig) => {
       try { if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, sig); else child.kill(sig); } catch (e) { if (e.code !== 'ESRCH') error ??= e.message; }
@@ -65,20 +68,20 @@ export async function runProcess(argv, { cwd, timeoutMs, signal, limitBytes = 10
     });
   });
 }
-export async function executeCheck(root, spec, signal) {
+export async function executeCheck(root, spec, signal, scope) {
   if (spec.cwd !== '.') await noSymlinks(root, spec.cwd, false);
   const cwd = path.join(root, spec.cwd);
   requireThat((await fs.stat(cwd)).isDirectory(), 'Check cwd is not a directory');
-  const before = await snapshot(root);
+  const before = await snapshot(root, 50000, scope);
   const startedAt = now(), result = await runProcess(spec.argv, { cwd, timeoutMs: spec.timeoutMs, signal });
-  const after = await snapshot(root);
+  const after = await snapshot(root, 50000, scope);
   const id = `E-${randomUUID()}`;
   const log = `.far/evidence/${id}.log`;
   await atomicWrite(root, log, result.output);
   const status = before.digest !== after.digest ? 'CHANGED_DURING_RUN' : result.cancelled ? 'CANCELLED' : result.timedOut ? 'TIMEOUT' : result.exitCode === 0 && !result.error ? 'PASS' : 'FAIL';
   const { output, ...recorded } = result;
-  return { id, checkId: spec.id, specHash: spec.specHash, argv: spec.argv, cwd: spec.cwd, startedAt, finishedAt: now(),
-    snapshot: before.digest, afterSnapshot: after.digest, status, ...recorded, log, logHash: hash(output),
+  return { id, checkId: spec.id, specHash: spec.specHash, contextKey: spec.contextKey ?? 'default', argv: spec.argv, cwd: spec.cwd, startedAt, finishedAt: now(),
+    snapshot: before.digest, afterSnapshot: after.digest, inputManifestHash: before.digest, scopeFingerprint: before.digest, status, ...recorded, log, logHash: hash(output),
     environment: { node: process.version, platform: process.platform, arch: process.arch, release: os.release(),
       removedHarnessVariables: ['NODE_TEST_CONTEXT'], selected: Object.fromEntries(['CI', 'NODE_ENV', 'TZ', 'LANG', 'PYTHONHASHSEED'].map(k => [k, childEnvironment()[k] ?? null])) },
     provenance: 'locally-executed-command', assertion: 'Exit status is recorded; test adequacy and semantic correctness require review.' };

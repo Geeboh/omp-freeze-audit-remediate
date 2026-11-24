@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { definitions } from '../src/schemas.mjs';
 import { FAR_AGENTS } from '../src/index.js';
-const run = promisify(execFile), root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const run = promisify(execFile), root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), artifactMode = process.argv.includes('--artifact');
 const problems = [];
 function ok(test, message) { if (!test) problems.push(message); }
 async function all(dir) { const out = []; for (const e of await fs.readdir(dir, { withFileTypes: true })) { const f = path.join(dir,e.name); if (e.isSymbolicLink()) problems.push(`Unexpected package symlink: ${f}`); else if(e.isDirectory()) out.push(...await all(f)); else out.push(f); } return out; }
@@ -39,16 +39,25 @@ for(const file of files.filter(f=>f.endsWith('.md'))) {
   try { await fs.access(dest); } catch { problems.push(`Broken local link: ${path.relative(root,file)} -> ${link}`); }
  }
 }
+const syntaxRuntime=process.versions.bun ? 'node' : process.execPath;
 let syntaxCount=0;
-for(const f of files.filter(f=>/\.(mjs|js)$/.test(f))) { try { await run(process.execPath,['--check',f]); syntaxCount++; } catch(e) { problems.push(`Syntax: ${f}: ${e.stderr}`); } }
-const manifest=path.join(root,'MANIFEST.sha256');
-let integrityCount=0;
-try {
- for(const line of (await fs.readFile(manifest,'utf8')).trim().split('\n')) {
-  const m=line.match(/^([a-f0-9]{64})  (.+)$/); if(!m) { problems.push('Malformed manifest line'); continue; }
-  const target=path.resolve(root,m[2]); if(!target.startsWith(root+path.sep)) { problems.push('Manifest traversal'); continue; }
-  const actual=createHash('sha256').update(await fs.readFile(target)).digest('hex'); ok(actual===m[1],`Integrity mismatch: ${m[2]}`); integrityCount++;
- }
-} catch(e) { if(e.code!=='ENOENT') throw e; }
-const summary={package:pkg.name,version:pkg.version,files:files.length,tools:defs.length,agents:FAR_AGENTS.length,skills:1,syntaxChecked:syntaxCount,integrityChecked:integrityCount,liveOmpHost:'NOT_RUN',problems};
+for(const f of files.filter(f=>/\.(mjs|js)$/.test(f))) { try { await run(syntaxRuntime,['--check',f]); syntaxCount++; } catch(e) { problems.push(`Syntax: ${f}: ${e.stderr}`); } }
+let integrityCount=0, manifestFiles=0;
+if (artifactMode) {
+ const manifest=path.join(root,'MANIFEST.sha256');
+ try {
+  const listed = new Set();
+  for(const line of (await fs.readFile(manifest,'utf8')).trim().split('\n')) {
+   const m=line.match(/^([a-f0-9]{64})  (.+)$/); if(!m) { problems.push('Malformed manifest line'); continue; }
+   if(listed.has(m[2])) { problems.push(`Duplicate manifest path: ${m[2]}`); continue; }
+   listed.add(m[2]); const target=path.resolve(root,m[2]); if(!target.startsWith(root+path.sep)) { problems.push('Manifest traversal'); continue; }
+   const actual=createHash('sha256').update(await fs.readFile(target)).digest('hex'); ok(actual===m[1],`Integrity mismatch: ${m[2]}`); integrityCount++;
+  }
+  const actualFiles = new Set(files.map(f => path.relative(root,f).split(path.sep).join('/')).filter(f => f !== 'MANIFEST.sha256'));
+  for (const file of actualFiles) if (!listed.has(file)) problems.push(`Unlisted artifact file: ${file}`);
+  for (const file of listed) if (!actualFiles.has(file)) problems.push(`Manifest file missing from artifact: ${file}`);
+  manifestFiles = listed.size;
+ } catch(e) { if(e.code!=='ENOENT') throw e; }
+}
+const summary={package:pkg.name,version:pkg.version,files:files.length,tools:defs.length,agents:FAR_AGENTS.length,skills:1,syntaxChecked:syntaxCount,integrityChecked:integrityCount,manifestFiles,artifactMode,liveOmpHost:'NOT_RUN',problems};
 console.log(JSON.stringify(summary,null,2)); if(problems.length) process.exitCode=1;

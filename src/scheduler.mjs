@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { requireThat, text, relative, now } from './io.mjs';
 export const TASK_KINDS = ['audit', 'fix', 'review', 'test', 'document'];
-export const TERMINAL_TASK = new Set(['done', 'deferred']);
+export const TERMINAL_TASK = new Set(['done']);
 export function intersects(a, b) {
   return a === '.' || b === '.' || a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
@@ -74,22 +74,22 @@ export function selectWave(s, { isolation = false, limit = s.options.parallel } 
 export function leaseWave(s, opts) {
   const selected = selectWave(s, opts);
   for (const t of selected) {
-    t.status = 'running'; t.lease = randomUUID(); t.startedAt = now(); t.attempts += 1;
-    t.isolated = !!opts.isolation && t.writePaths.length > 0;
-    t.assignedAgent = agentFor(t);
+    t.status = 'running'; t.lease = randomUUID(); t.fencingGeneration = (t.fencingGeneration ?? 0) + 1; t.dispatchKey = randomUUID();
+    t.leaseExpiresAt = new Date(Date.now() + (opts.leaseTimeoutSeconds ?? 1800) * 1000).toISOString();
+    t.startedAt = now(); t.attempts += 1; t.isolated = !!opts.isolation && t.writePaths.length > 0; t.assignedAgent = agentFor(t);
   }
   return selected.map(t => ({ ...t, tier: tier(t) }));
 }
-export function settleTask(s, { id, lease, outcome, summary, infrastructure = false }) {
+export function settleTask(s, { id, lease, fencing, outcome, summary, infrastructure = false }) {
   const t = s.tasks.find(x => x.id === id);
-  requireThat(t && t.status === 'running' && t.lease === lease, 'Unknown task, stale lease or task not running', 'LEASE_MISMATCH');
-  requireThat(['done', 'failed', 'blocked'].includes(outcome), 'Invalid task outcome');
+  requireThat(t && t.status === 'running' && t.lease === lease && (fencing === undefined || t.fencingGeneration === fencing), 'Unknown task, stale lease or task not running', 'LEASE_MISMATCH');
+  requireThat(['done', 'failed', 'blocked', 'deferred', 'shelved', 'denied', 'cancelled'].includes(outcome), 'Invalid task outcome');
   summary = text(summary, 'task result summary');
   const beforeTier = tier(t);
-  t.history.push({ at: now(), outcome, summary, infrastructure, tier: beforeTier, lease });
+  t.history.push({ at: now(), outcome, summary, infrastructure, tier: beforeTier, lease, fencing: t.fencingGeneration });
   if (outcome === 'failed' && !infrastructure) t.failedRepairs += 1;
   if (outcome === 'done') t.status = 'done';
-  else if (outcome === 'blocked' || infrastructure) t.status = 'blocked';
+  else if (['blocked', 'deferred', 'shelved', 'denied', 'cancelled'].includes(outcome) || infrastructure) t.status = outcome === 'failed' ? 'blocked' : outcome;
   else {
     const base = t.risk === 'high' ? 2 : t.risk === 'medium' ? 1 : 0;
     t.status = t.failedRepairs >= (3 - base) * 2 ? 'blocked' : 'pending';

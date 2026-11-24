@@ -1,22 +1,20 @@
-# Validation record — 1.0.0
+# Validation record — 2.0.0-rc.1
 
-Validation date: **17 November 2026**. Environment: Linux x86_64, Node.js **22.16.0**, Git **2.47.3**. No runtime npm dependencies were installed.
+Validation date: **25 November 2026**. Environment: Linux x86_64, Node.js **24.22.3**, Git **2.43.0**, OMP **19.1.1**. Bun is absent.
 
 ## Results
 
 | Validation surface | Result | Evidence and limits |
 |---|---|---|
-| Core/adapter/CLI unit and integration suite | **96 passed, 0 failed, 0 skipped** | `node --test tests/*.test.mjs`; actual temporary Git repositories and child processes, plus an explicitly mocked OMP API |
-| Offline installer checks | **12 passed, 0 failed** | Extraction, hashes, installed imports/CLI, package metadata/syntax/links, overwrite preservation, path/symlink protection and corrupted payload rejection |
-| Package consistency | **PASS** | Manifest entry, one skill, seven agents, eight tool schemas, local Markdown links, JavaScript syntax and generated integrity manifest |
-| Regression demonstration | **PASS** | Actual failing Node assertion on a deliberately broken arithmetic fixture, deterministic source correction, passing assertion, fresh evidence and completed gates |
-| Cross-process coordination | **PASS** | Concurrent CLI writers preserve distinct records; task claims and state locks tested |
-| Native OMP host loading / Bun runtime | **NOT RUN** | Neither executable was available in the build environment |
-| Real model calls / role routing / agent discovery | **NOT RUN** | Contract-shaped mock and upstream API inspection only; no provider credentials/calls |
-| Real target-project remediation | **NOT RUN** | No target project source was supplied for this package build |
-| Windows/macOS behavior | **NOT RUN** | Linux validation only; POSIX process-group cleanup differs from Windows |
+| Behavioral suite | **117 passed, 0 failed, 0 skipped** | `npm test`; temporary Git repositories, subprocesses and deterministic policy/recovery fixtures |
+| Development package checks | **PASS** | Exact final commit `npm run check`; 60 tracked files discovered, 27 JavaScript files syntax-checked, source manifest integrity intentionally not required |
+| Pack integrity | **PASS** | `python3 docs/overhaul/FAR-Overhaul-Pack-v2.0.0/scripts/verify-pack.py --root docs/overhaul/FAR-Overhaul-Pack-v2.0.0`; 56 files and 79/50 contract cases |
+| Pinned source reproductions | **COLLECTED** | Three v1 gate gaps reproduced against d5bba12; safe behavior is covered by `tests/gates-regression.test.mjs` |
+| Release artifact build/installer/rollback | **PASS** | Clean committed candidate built `2.0.0-rc.1`; ZIP and Bun-aware installer validation passed 14 checks; missing-Bun provisioning passed separately; migration restore passed separately; exact receipt and hashes are retained outside source |
+| Live OMP extension/provider smoke | **PASS** | Exact `2.0.0-rc.1` artifact loaded in OMP 19.1.1; `far` help/doctor returned; bounded `openai-codex/gpt-5.6-luna` smoke returned `HOST_SMOKE_OK` in 24.21s with `--max-time 90 --max-cost 1` |
+| Bun and non-Linux behavior | **PARTIAL / WAIVED** | Bun 1.4.5 ran 117/117 tests and package smoke. User explicitly waived non-Linux qualification for this publication; non-Linux remains NOT_RUN |
 
-The deliberate fixture edit is test code, not evidence that a live AI agent remediated a repository. Separate-review records in fixtures are labelled fixtures. No usability, hardware or user acceptance testing is claimed or required by the workflow.
+The suite covers review precedence, latest applicable evidence, plan action coverage, dependency success, escalation policies, exact approvals, reservations, bounded stopping, reconciliation/fencing, pause/cancel/resume, schema migration, scope, deduplication and pagination. Mock extension tests remain host-contract evidence, not live-host qualification.
 
 ## Important checks exercised
 
@@ -32,12 +30,11 @@ Mock extension tests check eight registrations, essential/discoverable metadata,
 npm test
 npm run check
 ```
-
 The release builder additionally uses Python 3's standard library:
 
 ```bash
 python3 scripts/build-release.py /tmp/far-release-output
-node scripts/validate-release.mjs /tmp/far-release-output/omp-freeze-audit-remediate-1.0.0-install.mjs
+node scripts/validate-release.mjs /tmp/far-release-output/omp-freeze-audit-remediate-2.0.0-rc.1-install.mjs
 ```
 
 These are package-maintainer automated checks, not a mandatory end-user testing gate. Live host prerequisites remain documented in [Compatibility](COMPATIBILITY.md).

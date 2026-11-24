@@ -1,6 +1,6 @@
 # OMP Freeze Audit Remediate
 
-**Plugin 1.0.0 · workflow policy v4.1 · parallel-first · no user testing**
+**Release candidate 2.0.0-rc.1 · workflow policy v5 · parallel-first · no user testing**
 
 An executable Oh My Pi extension for feature freeze, repository-wide audit, bug remediation, pragmatic DRY/KISS cleanup and automated release qualification. It combines a discoverable skill, seven specialist agent definitions, eight model-callable tools, a slash command, a durable local ledger, a conflict-aware scheduler and a real command/evidence runner.
 
@@ -8,19 +8,20 @@ An executable Oh My Pi extension for feature freeze, repository-wide audit, bug 
 
 ## Install once
 
-Requires an existing OMP installation, Node.js 20+ and Git. No third-party Node runtime dependencies, API keys or separate MCP service are required by the plugin. Model calls still need your working OMP provider configuration.
+Requires an existing OMP installation, Node.js 22+, Bun 1.4.5+ and Git. The generated installer installs Bun when missing. Model calls still need your working OMP provider configuration.
 
 From the directory containing the distributed single-file installer:
 
 ```bash
-node ./omp-freeze-audit-remediate-1.0.0-install.mjs \
-  "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0"
-omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0"
+node ./omp-freeze-audit-remediate-2.0.0-rc.1-install.mjs \
+  "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1"
+omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1"
 ```
 
-The installer verifies the embedded files, refuses an existing destination, performs no downloads and does not change OMP configuration. `omp plugin link` is the explicit separate registration step. Keep the installed directory in place. Start a **new OMP session** to load it.
+The installer verifies embedded files, installs or reuses Bun 1.4.5+, refuses an existing destination, and does not change OMP configuration. Missing-Bun installation needs network access and Linux/macOS `unzip`. `omp plugin link` is the explicit separate registration step. Keep the installed directory in place. Start a **new OMP session** to load it.
+The release builder uses `package.json` identity and a tracked allowlist. It writes manifests and receipts only to the output directory. Development checks do not require the source manifest to be current.
 
-Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-1.0.0` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
+Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-2.0.0-rc.1` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
 
 ## Recommended full run
 
@@ -71,6 +72,8 @@ Useful controls:
 /far doctor
 /far report
 /far pause
+/far cancel
+/far migrate
 /far resume
 ```
 
@@ -106,6 +109,9 @@ Validation commands run concurrently only when explicitly declared parallel-safe
 ## Model policy
 
 Auto mode uses actual configured OMP roles: `@smol` for routine work, `@default` for complex work and `@slow` for consequential work. Agent overrides remain supported. Configure these roles to your available Luna/Sol/Astra choices or other models using OMP's supported settings; the package does not guess provider IDs or change your parent model.
+Escalation uses `never`, `shelve`, `ask` and `always`. New runs default to `shelve`. One approved execution envelope covers route, effort, fallback, coordinator, reviewers and extra workers. Exact proposals require trusted approval; the real OMP host must expose tested enforcement or FAR shelves the upgrade.
+
+Budgets use transactional integer reservations. Unknown monetary usage is not zero. Shelved or denied blockers remain unresolved. Final release checks run on the integrated candidate and staged artifact bytes.
 
 Two substantive failed attempts escalate a task; infrastructure failures block rather than burn repair attempts. After bounded deep-tier failures, stop that task pending new evidence. No fixed workload percentages, automatic spending promises or assumed model capability rankings are used. Actual observed native worker metadata is recorded when available; unavailable usage/cost information stays unavailable.
 
@@ -140,4 +146,4 @@ npm test
 npm run check
 ```
 
-The tests use temporary repositories and fixtures, not a paid provider. Package `1.0.0` is the first executable release; `v4.1` labels the revised workflow policy derived from the conversation's v4 prompt.
+The tests use temporary repositories and fixtures, not a paid provider. Release candidate `2.0.0-rc.1` uses state schema 2, policy schema 2 and Node.js 22+. Live OMP route enforcement, provider calls, Bun and non-Linux behavior remain unclaimed unless separately qualified.

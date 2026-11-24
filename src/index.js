@@ -20,8 +20,9 @@ export async function modelsStatus(ctx, engine) {
     let m; try { m = await ctx.models?.resolve?.(role); } catch { /* diagnostic only */ }
     roleModels[tier] = { role, resolved: modelIdentity(m), available: !!m };
   }
-  return { mode: (await engine.state(false))?.options.modelMode ?? 'auto', current: modelIdentity(await ctx.models?.current?.() ?? ctx.model), roles: roleModels,
-    registryAvailable: typeof ctx.models?.resolve === 'function', note: 'Role names are your configuration; no benchmark ranking or price claim. Native operator overrides take precedence in auto mode. Actual execution is recorded only when native task metadata is observed.' };
+  const state = await engine.state(false);
+  return { mode: state?.options.modelMode ?? 'auto', current: modelIdentity(await ctx.models?.current?.() ?? ctx.model), roles: roleModels, policy: state?.options.policy ?? null, budget: state?.budget ?? null, hostEnforcement: false,
+    registryAvailable: typeof ctx.models?.resolve === 'function', note: 'Role names are your configuration; no benchmark ranking or price claim. Native operator overrides take precedence in auto mode. Actual execution is recorded only when native task metadata is observed. Escalation upgrades remain shelved unless the host exposes tested exact-route enforcement.' };
 }
 export async function hostDoctor(pi, ctx, engine) {
   const tools = typeof pi.getAllTools === 'function' ? pi.getAllTools() : [];
@@ -68,8 +69,8 @@ export default function freezeAuditRemediate(pi) {
   }
   const show = (text) => pi.sendMessage({ customType: 'far-output', content: text, display: true, attribution: 'agent' }, { triggerTurn: false });
   pi.registerCommand('far', {
-    description: 'Feature freeze, parallel repository audit/remediation and automated verification. /far help; full|audit|plan|remediate|verify|resume; --parallel N --models auto|current.',
-    getArgumentCompletions: prefix => ['full', 'audit', 'plan', 'remediate', 'verify', 'resume', 'status', 'doctor', 'report', 'models', 'pause', 'help'].filter(x => x.startsWith(prefix.trim())).map(value => ({ value, label: value })),
+    description: 'Feature freeze, bounded parallel audit/remediation and automated verification. /far help; five modes; --parallel N --models auto|current --profile PROFILE --scope path[,path] --since REV --escalation MODE.',
+    getArgumentCompletions: prefix => ['full', 'audit', 'plan', 'remediate', 'verify', 'resume', 'status', 'doctor', 'report', 'models', 'pause', 'cancel', 'migrate', 'help'].filter(x => x.startsWith(prefix.trim())).map(value => ({ value, label: value })),
     handler: async (args, ctx) => {
       try {
         const { command, opts } = parseCommand(args);
@@ -87,12 +88,18 @@ export default function freezeAuditRemediate(pi) {
           }
           await engine.control('pause'); await progress(ctx, engine); show('FAR paused. No automatic reactivation; /far resume continues.'); return;
         }
+        if (command === 'cancel') {
+          await engine.control('cancel', 'Explicit /far cancel command'); await progress(ctx, engine); show('FAR cancelled. Running workers remain subject to reconciliation.'); return;
+        }
+        if (command === 'migrate') {
+          const data = await engine.migration('inspect'); show(JSON.stringify(data, null, 2)); return;
+        }
         requireThat(MODES.includes(command) || command === 'resume', 'Unknown /far command. Use /far help.');
         requireThat(typeof ctx.isIdle !== 'function' || ctx.isIdle(), 'Interrupt/wait for the current turn before starting a separate FAR workflow');
         let s = await engine.state(false);
         const mode = command === 'resume' ? s?.mode : command;
         requireThat(mode, 'No FAR run exists to resume');
-        const settings = { parallel: opts.parallel ?? s?.options.parallel ?? 4, modelMode: opts.modelMode ?? s?.options.modelMode ?? 'auto' };
+        const settings = { parallel: opts.parallel ?? s?.options.parallel ?? 4, modelMode: opts.modelMode ?? s?.options.modelMode ?? 'auto', profile: opts.profile ?? s?.options.profile ?? 'balanced', scope: opts.scope ?? s?.options.scope, escalationMode: opts.escalationMode ?? s?.options.policy?.escalation?.mode ?? 'shelve' };
         // Do not steal another goal, or silently fall back to a one-turn run.
         let goalRequest;
         if (opts.goal) {
