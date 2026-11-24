@@ -13,7 +13,7 @@ if(!input) throw new Error('Usage: node scripts/validate-release.mjs /path/to/ge
 const installer=path.resolve(input), packageZip=path.join(path.dirname(installer),path.basename(installer).replace(/-install\.mjs$/,'.zip')), tmp=await fs.mkdtemp(path.join(os.tmpdir(),'far-release-check-'));
 const checks=[];
 const pass=name=>checks.push({name,status:'PASS'});
-const run=async(file,args=[],options={})=>exec(process.execPath,[file,...args],{maxBuffer:16*1024*1024,...options});
+const run=async(file,args=[],options={})=>exec(process.execPath,[file,...args],{maxBuffer:16*1024*1024,...options}), runCommand=async(command,args=[],options={})=>exec(command,args,{maxBuffer:16*1024*1024,...options});
 const hash=b=>createHash('sha256').update(b).digest('hex');
 try {
  const dest=path.join(tmp,'installed package');
@@ -24,7 +24,7 @@ try {
   const [expected,rel]=line.split('  '); assert.equal(hash(await fs.readFile(path.join(dest,rel))),expected,rel); files++;
  }
  assert(files>40); pass('every manifest file matches its SHA-256');
- const zipEntries=JSON.parse((await run('python3',['-c','import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); print(json.dumps(sorted(z.namelist())))',packageZip])).stdout);
+ const zipEntries=JSON.parse((await runCommand('python3',['-c','import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); print(json.dumps(sorted(z.namelist())))',packageZip])).stdout);
  assert(zipEntries.length>0 && zipEntries.every(name=>name.startsWith(path.basename(packageZip,'.zip')+'/'))); pass('generated ZIP is readable and path-contained');
  const check=JSON.parse((await run(path.join(dest,'scripts/check-package.mjs'),['--artifact'])).stdout); assert.equal(check.problems.length,0); assert.equal(check.artifactMode,true); assert(check.tools>0 && check.agents>0); pass('extracted package discovery metadata, local links, syntax and exact manifest checks');
  const help=await run(path.join(dest,'bin/far.mjs'),['help']); assert.match(help.stdout,/Freeze Audit Remediate/); pass('installed standalone CLI help');
