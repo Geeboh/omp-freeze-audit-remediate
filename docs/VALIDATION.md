@@ -41,3 +41,23 @@ node scripts/validate-release.mjs /tmp/far-release-output/omp-freeze-audit-remed
 ```
 
 These are package-maintainer automated checks, not a mandatory end-user testing gate. Live host prerequisites remain documented in [Compatibility](COMPATIBILITY.md).
+
+## `2.0.0-rc.1` candidate qualification
+
+Release qualification runs from a clean detached worktree. The exact source commit, build inputs, artifact names, and hashes are recorded in `/tmp/far-release-candidate-2.0.0-rc.1/omp-freeze-audit-remediate-2.0.0-rc.1-RECEIPT.json`.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Core and overhaul tests | **110 passed, 0 failed, 0 skipped** | `npm test` |
+| Development package check | **PASS** | `npm run check`; 28 JavaScript files parsed, 8 tools, 7 agents, 0 problems |
+| Pack verification | **PASS** | `python3 docs/overhaul/FAR-Overhaul-Pack-v2.0.0/scripts/verify-pack.py --root docs/overhaul/FAR-Overhaul-Pack-v2.0.0` |
+| Release archive and installer | **PASS** | `/tmp/far-release-candidate-2.0.0-rc.1/validation.json`; 14 checks passed, 58 manifest files |
+| Reproducible build | **PASS** | Two clean worktree builds compared byte-for-byte for ZIP, installer, checksum file, and receipt |
+| CLI and host probes | **LIMITED** | OMP `19.1.1`, Node `24.22.3`, and Git `2.43.0` observed. Bun absent. Real OMP extension loading, native task dispatch, trusted host approval, and provider execution are **NOT_RUN**. |
+
+## Candidate artifacts
+
+The retained local candidate is `/tmp/far-release-candidate-2.0.0-rc.1`.
+
+The retained receipt records the exact SHA-256 values for the ZIP, installer, checksum file, and receipt. The candidate is prepared locally and not published.
+
