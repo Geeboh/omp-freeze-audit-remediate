@@ -24,3 +24,12 @@ test('command parser rejects invalid flags and limits', () => { assert.throws(()
 test('launch uses native goal/approval-mode/no-prewalk without incompatible prompt attachments', () => { const opts = parseArgs(['launch', 'full', '--parallel', '8']); const a = launchArgs(opts); assert(a.includes('--goal')); assert(a.includes('--approval-mode=yolo')); assert(a.includes('--no-prewalk')); assert(!a.includes('--yolo')); assert(a.includes('--extension')); assert(!a.includes('--continue')); assert(!a.some(v => v.startsWith('@'))); });
 test('native goal refusal leaves a paused resumable ledger and no work prompt', async t => { const { dir, engine } = await fixture(t); const h = mockHost(dir); h.ctx.sessionModes.set = async () => ({ ok: false, code: 'disabled', message: 'Goal mode is disabled' }); plugin(h.pi); await h.commands.get('far').handler('full', h.ctx); assert.equal((await engine.status()).status, 'paused'); assert.equal(h.sent.filter(s => s.prompt).length, 0); });
 test('host prompt rejection pauses the ledger instead of claiming an active run', async t => { const { dir, engine } = await fixture(t); const h = mockHost(dir); h.pi.sendUserMessage = async () => { throw new Error('Host budget exhausted'); }; plugin(h.pi); await h.commands.get('far').handler('full', h.ctx); assert.equal((await engine.status()).status, 'paused'); assert.equal(h.state.goal.status, 'paused'); });
+
+test('model-callable escalation changes cannot manufacture trusted policy control', async t => {
+  const { dir } = await fixture(t);
+  const h = mockHost(dir);
+  plugin(h.pi);
+  const result = await h.tools.get('far').execute('id', { action: 'escalation_set', policy: 'always' }, undefined, undefined, h.ctx);
+  assert(result.isError);
+  assert.match(result.content[0].text, /trusted user\/control origin/);
+});
