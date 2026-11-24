@@ -121,7 +121,8 @@ def build(output: Path) -> dict[str, object]:
     checksums = "".join(f"{digest(path.read_bytes())}  {path.name}\n" for path in [archive, installer])
     sums.write_text(checksums)
     result = {"schemaVersion": 1, "package": name, "version": version, "sourceCommit": commit, "files": len(staged_paths), "zip": str(archive), "installer": str(installer), "checksums": str(sums), "receipt": str(receipt), "sourceDateEpoch": epoch}
-    receipt.write_text(json.dumps({**result, "artifacts": [{"file": path.name, "sha256": digest(path.read_bytes())} for path in [archive, installer, sums]], "publication": "NOT_PUBLISHED"}, indent=2) + "\n")
+    receipt_data = {"schemaVersion": 1, "product": name, "version": version, "sourceCommit": commit, "files": len(staged_paths), "sourceDateEpoch": epoch, "artifacts": [{"file": path.name, "sha256": digest(path.read_bytes())} for path in [archive, installer, sums]], "publication": "NOT_PUBLISHED"}
+    receipt.write_text(json.dumps(receipt_data, indent=2) + "\n")
     return result
 
 
