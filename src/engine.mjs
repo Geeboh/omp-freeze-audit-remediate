@@ -69,7 +69,9 @@ export class FarEngine {
       const rawInitial = await snapshot(this.root), baseline = await gitState(this.root);
       const resolvedOptions = options(input);
       const initial = scopedSnapshot(rawInitial, resolvedOptions.scope);
-      const policy = createPolicy({ mode: input.escalationPolicy ?? 'shelve', envelope: input.envelope, source: input.escalationPolicy ? 'explicit-run' : 'builtin-default' });
+      const requestedPolicy = input.escalationPolicy ?? 'shelve';
+      requireThat(requestedPolicy === 'shelve' || ['user-command', 'host-user', 'trusted-control'].includes(input.trustedOrigin), 'Non-default escalation policy requires a trusted user/control origin');
+      const policy = createPolicy({ mode: requestedPolicy, envelope: input.envelope, source: input.trustedOrigin ?? (input.escalationPolicy ? 'explicit-run' : 'builtin-default') });
       const s = { schemaVersion: STATE_SCHEMA_VERSION, configSchemaVersion: 1, policySchemaVersion: policy.schemaVersion, version: VERSION, root: this.root,
         repositoryId: `git:${baseline.head ?? this.root}`, runId: randomUUID(), revision: 1, createdAt: now(), updatedAt: now(),
         mode, status: 'active', lifecycle: 'active', outcome: null, pauseReason: null, readiness: 'NOT_ASSESSED', stage: 'feature-freeze',
@@ -95,8 +97,9 @@ export class FarEngine {
     return mutate(this.root, s => {
       s.options = options(input, s.options); s.scope = s.options.scope;
       if (input.escalationPolicy) {
+        requireThat(['user-command', 'host-user', 'trusted-control'].includes(input.trustedOrigin), 'Policy changes require a trusted user/control origin');
         requireThat(ESCALATION_POLICIES.includes(input.escalationPolicy), 'Invalid escalation policy');
-        s.policy = { ...currentPolicy(s), mode: input.escalationPolicy, revision: currentPolicy(s).revision + 1, source: input.trustedOrigin ? 'trusted-control' : 'configuration' };
+        s.policy = { ...currentPolicy(s), mode: input.escalationPolicy, revision: currentPolicy(s).revision + 1, source: input.trustedOrigin };
         event(s, 'policy-changed', { mode: s.policy.mode, revision: s.policy.revision, source: s.policy.source });
       }
       event(s, 'options-changed', s.options); return s.options;

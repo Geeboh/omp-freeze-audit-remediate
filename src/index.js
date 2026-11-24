@@ -126,7 +126,7 @@ export default function freezeAuditRemediate(pi) {
           requireThat(modes.goal.status === 'inactive' || modes.goal.objective?.startsWith('[FAR]'), 'A different native goal is active. FAR will not replace it.', 'GOAL_CONFLICT');
           goalRequest = modes.goal.status === 'paused' ? { mode: 'goal', action: 'resume' } : { mode: 'goal', action: 'enter', objective: objective(mode, settings) };
         }
-        if (!s) await engine.start({ mode, ...settings });
+        if (!s) await engine.start({ mode, ...settings, trustedOrigin: 'user-command' });
         else {
           if (s.mode !== mode) await engine.changeMode(mode, `Explicit /far ${mode} command`);
           else await engine.control('resume');

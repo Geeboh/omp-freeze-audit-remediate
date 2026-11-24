@@ -69,7 +69,7 @@ async function main() {
     return;
   }
   let output;
-  if (opts.cmd === 'init') output = await engine.start(opts);
+  if (opts.cmd === 'init') output = await engine.start({ ...opts, trustedOrigin: 'user-command' });
   else if (['escalation', 'shelf'].includes(opts.cmd)) {
     const action = opts.cmd === 'escalation' ? (opts.subcommand === 'status' ? 'escalation_status' : 'escalation_set')
       : (opts.subcommand === 'list' ? 'shelf_list' : opts.subcommand === 'show' ? 'shelf_show' : opts.subcommand === 'approve' ? 'shelf_approve' : opts.subcommand === 'deny' ? 'shelf_deny' : 'shelf_retry');
