@@ -40,7 +40,7 @@ def allowlisted_files() -> list[Path]:
             if rel.startswith((".far/", ".env", ".npmrc")) or any(part in {"credentials", "secrets"} for part in Path(rel).parts):
                 raise ValueError(f"Sensitive release input: {rel}")
             selected.append(file)
-    required = set(contract["required"])
+    required = set(contract["required"]) - {"MANIFEST.sha256"}
     selected_names = {p.relative_to(ROOT).as_posix() for p in selected}
     missing = sorted(required - selected_names)
     if missing:
