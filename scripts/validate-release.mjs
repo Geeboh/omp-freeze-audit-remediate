@@ -35,7 +35,7 @@ try {
   await assert.rejects(run(installer, [dest])); assert.equal(await fs.readFile(path.join(dest, 'preserve-me.txt'), 'utf8'), 'user-change'); pass('existing destination refused without changing existing files');
   const existingFile = path.join(tmp, 'existing-file'); await fs.writeFile(existingFile, 'original'); await assert.rejects(run(installer, [existingFile])); assert.equal(await fs.readFile(existingFile, 'utf8'), 'original'); pass('existing file destination refused');
   const real = path.join(tmp, 'real'), link = path.join(tmp, 'link'); await fs.mkdir(real); await fs.symlink(real, link, 'dir'); await assert.rejects(run(installer, [path.join(link, 'new')])); await assert.rejects(fs.access(path.join(real, 'new'))); pass('symlinked ancestor refused');
-  const original = await fs.readFile(installer, 'utf8'), m = original.match(/const PAYLOAD = (\"[^\"\\n]+\");/); assert(m);
+  const original = await fs.readFile(installer, 'utf8'), m = original.match(/const PAYLOAD = ("[^"]+");/); assert(m);
   const entries = JSON.parse(gunzipSync(Buffer.from(JSON.parse(m[1]), 'base64')).toString());
   async function modified(name, change) {
     const copy = structuredClone(entries); change(copy);
