@@ -10,6 +10,14 @@ test('dependencies wait for prerequisite completion', async t => {
   const w = await engine.wave({ claim: true }); assert.deepEqual(w.tasks.map(x => x.id), ['A']);
   await engine.settle({ id: 'A', lease: w.tasks[0].lease, outcome: 'done', summary: 'Observed fixture source reviewed' }); assert.deepEqual((await engine.wave()).map(x => x.id), ['B']);
 });
+test('deferred prerequisites stay unresolved while independent work continues', async t => {
+  const { engine } = await fixture(t);
+  await engine.start({ parallel: 1 });
+  await engine.addTasks([job('a', { id: 'A' }), job('b', { id: 'B', dependsOn: ['A'] }), job('c', { id: 'C' })]);
+  const wave = await engine.wave({ claim: true });
+  await engine.settle({ id: 'A', lease: wave.tasks.find(x => x.id === 'A').lease, outcome: 'deferred', summary: 'Shelved by policy' });
+  assert.deepEqual((await engine.wave()).map(x => x.id), ['C']);
+});
 test('cycles are rejected before recording any tasks', async t => { const { engine } = await fixture(t); await engine.start(); await assert.rejects(engine.addTasks([job('a', { id: 'A', dependsOn: ['B'] }), job('b', { id: 'B', dependsOn: ['A'] })]), /cycle/); assert.equal((await engine.state()).tasks.length, 0); });
 test('unknown dependency rejected', async t => { const { engine } = await fixture(t); await engine.start(); await assert.rejects(engine.addTasks([job('a', { dependsOn: ['unknown'] })]), /Unknown dependency/); });
 test('only one shared-worktree writer may run', async t => { const { engine } = await fixture(t); await engine.start(); await engine.addTasks([job('a', { kind: 'fix', writePaths: ['src/a'] }), job('b', { kind: 'fix', writePaths: ['src/b'] })]); assert.equal((await engine.wave({ isolation: false })).length, 1); });

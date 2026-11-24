@@ -1,10 +1,10 @@
 # Compatibility and primary sources
 
-## Reviewed target, not a live-host certification
+## Reviewed target and measured host boundary
 
-Upstream public `main` documentation and TypeScript definitions were inspected on **17 November 2026**. At that retrieval the coding-agent package declared **18.22.0**. `main` is mutable; a commit SHA was not pinned. Compatibility with all earlier/later versions is not asserted.
+The overhaul candidate is `2.0.0-rc.1`. The implementation retains the ESM adapter, five modes, eight tools and atomic JSON state. Live capability claims remain separate from deterministic engine evidence.
 
-Local validation used Node.js 22.16.0 and Git 2.47.3 on Linux. No OMP executable, Bun runtime or authenticated model provider was available in the build environment. Actual OMP startup, package/agent discovery, native task execution, model routing and Bun-specific filesystem/process behavior remain **NOT RUN** here. Tests exercise the adapter against a contract-shaped mock, not the real host. See the exact [validation record](VALIDATION.md).
+Local validation used Node.js **24.22.3**, Git **2.43.0**, OMP **19.1.1** and Linux x86_64. Bun is absent. The OMP executable and CLI help are available, but this worktree has not been linked into a fresh OMP session; extension loading, native task execution, trusted approval origin, exact route enforcement and provider calls remain **NOT RUN**.
 
 ## Discovery contract
 

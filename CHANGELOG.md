@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0-rc.1 — 2026-11-25
+
+Core overhaul release candidate.
+
+- Latest authoritative review and check evidence, plan action coverage, successful dependency semantics and frozen-stage admission.
+- `never`, `shelve`, `ask` and `always` policy core with exact proposals, trusted one-use grants and transactional reservations.
+- Bounded waves, progress stopping, idempotent result settlement, fencing, dispatch reconciliation, pause/cancel/resume and schema-v1 migration restore.
+- Scoped inventory, conservative snapshot inputs, exact finding deduplication and cursor pagination.
+- Version-derived staged packaging with source-safe manifests, ZIP and installer validation, and explicit live-host limitations.
+
 ## 1.0.0 — 2026-11-17
 
 First executable package, implementing revised workflow policy v4.1 from the v4 master-prompt review.

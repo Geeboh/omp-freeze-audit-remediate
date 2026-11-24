@@ -6,9 +6,10 @@ Only the coordinator mutates shared state. Read actions use read approval, ledge
 
 ## far
 
-Actions: `help`, `start`, `status`, `doctor`, `report`, `pause`, `resume`, `blocked`, `configure`, `change_mode`, `prepare_branch`, `repair_lock`.
+Actions: `help`, `start`, `status`, `doctor`, `report`, `migrate`, `pause`, `resume`, `blocked`, `cancel`, `configure`, `change_mode`, `prepare_branch`, `repair_lock`.
 
-`start` accepts `mode`, `parallel` (1–32) and `modelMode` (`auto`/`current`). `configure` changes the latter two. `change_mode` requires a valid mode and an explicit `reason`; it preserves history and returns to feature-freeze. `blocked` requires a reason and refuses while runnable/running work remains. `prepare_branch` checks for a clean Git working tree (FAR's own state excluded); it does not stash, reset, stage or commit. `repair_lock` can clear only a recorded same-host dead process lock; it never steals a live lock.
+`start` accepts `mode`, `parallel` (1–32), `modelMode` (`auto`/`current`), `profile` (`quick`/`balanced`/`release`), `scope` and `escalationMode` (`never`/`shelve`/`ask`/`always`). New runs default to `shelve`. `migrate` supports inspect, dry-run, apply and restore through the versioned state boundary.
+`configure` changes run options through the same validators. `change_mode` requires a valid mode and an explicit `reason`; it preserves history and returns to feature-freeze. `blocked` and `cancel` persist terminal outcomes and do not claim owned processes stopped. `prepare_branch` checks for a clean Git working tree (FAR's own state excluded); it does not stash, reset, stage or commit.
 
 ```json
 {"action":"start","mode":"full","parallel":4,"modelMode":"auto"}
@@ -30,8 +31,9 @@ Actions: `scan`, `review`, `boundary`.
 
 ## far_findings
 
-Actions: `list`, `add`, `update`.
+Actions: `list`, `add`, `update`. `list` accepts `limit` and a stable `cursor` for structured pagination (`items`, `nextCursor`, `totalKnown`, `snapshotRevision`).
 
+`add.finding` also accepts optional exact deduplication fields `ruleId`, `location`, `signature` and `alias`. Exact duplicates preserve one finding and append provenance aliases; similarity is never an automatic merge.
 `add.finding`: `title`, `severity` (`critical/high/medium/low`), `classification` (`confirmed/suspected/debt/test-gap/documentation/opportunity`), `category`, `paths`, `evidence`, `impact`, `remediation`, optional `releaseBlocking`. Critical/high are always release-blocking. IDs are generated.
 
 `update.update`: `id`, `status` (`open/in_progress/fixed/verified/blocked/deferred/dismissed`), `reason`, optional `evidenceIds`, `reviewId`, `implementer`, `commits`.
@@ -40,13 +42,11 @@ A fixed finding is not verified. Verification needs at least one actual fresh pa
 
 ## far_tasks
 
-Actions: `list`, `seed`, `add`, `preview`, `claim`, `settle`, `reopen`.
+Actions: `list`, `seed`, `add`, `preview`, `claim`, `settle`, `reconcile`, `reopen`. `list` supports structured pagination.
 
-`seed` creates bounded audit tasks from the current inventory and avoids duplicate audit scopes. `add.tasks` contains records with `title`, `instructions`, `kind`, optional `id`, `risk`, `readPaths`, `writePaths`, `dependsOn`, `resources`, `priority`. Kinds are `audit/fix/review/test/document`. Use `fix` for creating test code; `test` means executing/investigating tests without intended source edits. Risk starts at low/economy, medium/standard or high/deep. Lower numeric priority runs first. Dependencies may reference existing or same-batch IDs; cycles and unknown IDs are rejected.
+`seed` creates bounded audit tasks from the current inventory and avoids duplicate audit scopes. `add.tasks` contains `findingIds`, `admission`, `title`, `instructions`, `kind`, optional `id`, `risk`, `readPaths`, `writePaths`, `dependsOn`, `resources`, `priority`. Shelved, denied, deferred, failed and cancelled dependencies do not satisfy ordinary prerequisites.
 
-Scopes use literal relative paths/prefixes, not globs. `readPaths:["."]` permits repository-wide reads. Write scope cannot be the whole repository or `.far`. Audits/reviews/tests have no product write scope. `resources` names external/shared constraints; `"*"` is exclusive.
-
-`preview` and `claim` accept `isolation` and `limit`. Set isolation true only after confirming native task isolation and patch-capture behavior. `claim` returns leases and `assignedAgent`; **it does not spawn workers**. Dispatch each ticket through native `task`. Settle each exact `id`/`lease` with `outcome` (`done/failed/blocked`), observed `summary`, and `infrastructure=true` when applicable. Reopening requires a new `reason` and never silently reclaims a live worker.
+`preview` and `claim` accept `isolation` and `limit`. `claim` returns leases, fencing generations and dispatch keys; it does not spawn workers. `reconcile` binds an observed worker ID to the exact lease and fencing token before settlement. `settle` accepts `done`, `failed`, `blocked`, `deferred`, `shelved`, `denied` and `cancelled`; use `idempotencyKey` for replay-safe result delivery.
 
 ## far_checks
 
@@ -80,9 +80,11 @@ Mandatory check evidence must be current, successful and intact. Open workers, m
 
 ## far_models
 
-Actions: `status`, `auto`, `current`.
+Actions: `status`, `auto`, `current`, `set`, `propose`, `approve`, `deny`, `reserve`, `settle`.
 
-`status` reads the actual live host registry, current parent model and role resolution where available. CLI diagnostics cannot resolve authenticated host models and say so. `auto` retains native model selection/overrides; `current` pins FAR workers through the documented pre-spawn hook to the actual parent selector. Neither action changes the parent model or global config. Provider fallback and complexity escalation are distinct.
+`status` reads the actual host registry, current parent model, policy, budget and route-enforcement boundary. `set` and `approve` require the trusted CLI or host control path. `propose` binds exact baseline/requested provider, model, effort, limits, scope fingerprint and evidence into an immutable digest. `reserve` consumes one grant use and reserves budgets and a worker slot transactionally. `settle` records actual usage or reconciliation.
+
+The CLI cannot resolve authenticated host models and says so. Auto/current routing remains available; unsupported upgrade enforcement shelves the proposal. A model-callable action cannot manufacture approval.
 
 ## Standalone JSON requests
 

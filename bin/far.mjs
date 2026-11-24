@@ -11,15 +11,20 @@ import { HELP, objective } from '../src/workflow.mjs';
 import { MODES } from '../src/gates.mjs';
 import { requireThat } from '../src/io.mjs';
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CLI_HELP = `${HELP}\nCLI (Node.js 20+)\n  node bin/far.mjs launch full --root /repo --parallel 4 --models auto\n  node bin/far.mjs launch full --root /repo --dry-run\n  node bin/far.mjs init --mode audit --root /repo\n  node bin/far.mjs status|doctor|inventory|seed|gate|advance|finish|report --root /repo\n  node bin/far.mjs request --file request.json --root /repo\n  node bin/far.mjs prompt full\n\nlaunch opens native OMP with --goal --yolo --no-prewalk and the package's\nparallel-safe per-launch overlay. --no-overlay omits that overlay. --omp PATH selects\nthe omp executable. No project edits, dependency installs or commits occur\nuntil the launched agent takes explicitly authorized development actions.\nrequest JSON: {"tool":"far_checks","arguments":{"action":"list"}}\n`;
+const CLI_HELP = `${HELP}\nCLI (Node.js 22+)\n  node bin/far.mjs launch full --root /repo --parallel 4 --models auto --profile release --escalation shelve\n  node bin/far.mjs launch full --root /repo --scope src,tests --since REV --dry-run\n  node bin/far.mjs init --mode audit --root /repo --profile quick\n  node bin/far.mjs status|doctor|inventory|seed|gate|advance|finish|report --root /repo\n  node bin/far.mjs request --file request.json --root /repo [--trusted]\n  node bin/far.mjs prompt full\n\nlaunch opens native OMP with --goal --yolo --no-prewalk and the package's\nparallel-safe per-launch overlay. --no-overlay omits that overlay. --omp PATH selects\nthe omp executable. No project edits, dependency installs or commits occur\nuntil the launched agent takes explicitly authorized development actions.\nrequest JSON: {\"tool\":\"far_checks\",\"arguments\":{\"action\":\"list\"}}\n`;
 export function parseArgs(argv) {
   const a = [...argv], cmd = a.shift() ?? 'help';
-  const out = { cmd, root: process.cwd(), mode: 'full', modelMode: 'auto', parallel: 4, omp: 'omp', overlay: true };
+  const out = { cmd, root: process.cwd(), mode: 'full', modelMode: 'auto', profile: 'balanced', scope: undefined, escalationMode: 'shelve', parallel: 4, omp: 'omp', overlay: true, trusted: false };
   if (['launch', 'prompt'].includes(cmd) && a[0] && !a[0].startsWith('--')) out.mode = a.shift();
   while (a.length) {
     const f = a.shift();
     if (f === '--dry-run') out.dryRun = true;
     else if (f === '--no-overlay') out.overlay = false;
+    else if (f === '--trusted') out.trusted = true;
+    else if (f === '--profile') { out.profile = a.shift(); requireThat(['quick', 'balanced', 'release'].includes(out.profile), '--profile must be quick, balanced or release'); }
+    else if (f === '--scope') { const value = a.shift(); out.scope = { include: value.split(',').filter(Boolean), dependencyMode: 'conservative' }; requireThat(out.scope.include.length > 0, '--scope requires one or more paths'); }
+    else if (f === '--since') { out.scope = { ...(out.scope ?? {}), since: a.shift() }; }
+    else if (f === '--escalation') { out.escalationMode = a.shift(); requireThat(['never', 'shelve', 'ask', 'always'].includes(out.escalationMode), '--escalation must be never, shelve, ask or always'); }
     else if (['--root', '--mode', '--models', '--parallel', '--file', '--omp'].includes(f)) {
       requireThat(a.length > 0, `Missing ${f} value`); const v = a.shift();
       const k = { '--root': 'root', '--mode': 'mode', '--models': 'modelMode', '--parallel': 'parallel', '--file': 'file', '--omp': 'omp' }[f]; out[k] = k === 'parallel' ? Number(v) : v;
@@ -69,9 +74,9 @@ async function main() {
     else raw = await fs.readFile(path.resolve(opts.file), 'utf8');
     const input = JSON.parse(raw);
     requireThat(typeof input.tool === 'string' && input.arguments && typeof input.arguments === 'object', 'Request requires tool and arguments');
-    output = await invoke(engine, input.tool, input.arguments);
+    output = await invoke(engine, input.tool, input.arguments, { trusted: opts.trusted });
   } else {
-    const actions = { status: ['far', 'status'], doctor: ['far', 'doctor'], inventory: ['far_inventory', 'scan'], seed: ['far_tasks', 'seed'], gate: ['far_gate', 'check'], advance: ['far_gate', 'advance'], finish: ['far_gate', 'finish'], report: ['far', 'report'], resume: ['far', 'resume'], pause: ['far', 'pause'] };
+    const actions = { status: ['far', 'status'], doctor: ['far', 'doctor'], inventory: ['far_inventory', 'scan'], seed: ['far_tasks', 'seed'], gate: ['far_gate', 'check'], advance: ['far_gate', 'advance'], finish: ['far_gate', 'finish'], report: ['far', 'report'], migrate: ['far', 'migrate'], resume: ['far', 'resume'], pause: ['far', 'pause'], cancel: ['far', 'cancel'] };
     requireThat(actions[opts.cmd], 'Unknown command. Use help.');
     output = await invoke(engine, actions[opts.cmd][0], { action: actions[opts.cmd][1] });
   }

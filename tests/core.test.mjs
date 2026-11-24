@@ -79,3 +79,15 @@ test('missing evidence log blocks release readiness', async t => { const { engin
 test('existing unrelated .far data is not overwritten', async t => { const { engine, dir } = await fixture(t); await fs.mkdir(path.join(dir, '.far')); await fs.writeFile(path.join(dir, '.far/README.md'), 'user data'); await assert.rejects(engine.start(), /nonempty/); assert.equal(await fs.readFile(path.join(dir, '.far/README.md'), 'utf8'), 'user data'); });
 test('executable-bit change invalidates the source review', async t => { const { engine, dir } = await fixture(t); await engine.start(); await reviewAll(engine); await fs.chmod(path.join(dir, 'src/main.js'), 0o755); assert.equal((await engine.gates()).criteria.find(c => c.id === 'review-coverage').status, 'FAIL'); });
 test('baseline excludes plugin-owned state noise', async t => { const { engine } = await fixture(t); await engine.start(); assert.equal((await engine.state()).baseline.porcelain, ''); });
+test('frozen stages admit only release-relevant task work', async t => {
+  const { engine } = await fixture(t);
+  await engine.start();
+  await reviewAll(engine);
+  await engine.addCheck(passCheck());
+  await engine.sealContract('Release qualification contract.');
+  await engine.runChecks();
+  await engine.advance();
+  const input = { title: 'late task', instructions: 'bounded qualification', kind: 'audit', readPaths: ['src/main.js'] };
+  await assert.rejects(engine.addTasks([input]), /frozen candidate/);
+  await engine.addTasks([{ ...input, admission: 'qualification' }]);
+});

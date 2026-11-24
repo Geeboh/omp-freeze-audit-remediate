@@ -5,7 +5,7 @@
 Start a fresh OMP session with the package and its explicit optional parallel overlay:
 
 ```bash
-node "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0/bin/far.mjs" launch full --root /path/to/project --parallel 4 --models auto
+node "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1/bin/far.mjs" launch full --root /path/to/project --parallel 4 --models auto --profile release --escalation shelve
 ```
 
 This starts native OMP with `--extension`, `--config`, `--no-prewalk`, `--yolo` and `--goal`. The launcher creates no model connection of its own. The parent model follows the installed skill and calls the tools.
@@ -42,6 +42,9 @@ omp --config "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0/configs/parall
 `--models current` pins FAR workers to the actual active parent model. This is the inexpensive single-model option when that model is suitable; it does not certify the model can solve every difficult issue. Risk classification, separate review and gates remain.
 
 The main coordinator is the model you selected in OMP. The plugin does not secretly switch it. Map roles to your available Luna/Sol/Astra choices through OMP's model selector or supported configuration. Inspect `/far models` rather than guessing provider IDs.
+`--profile quick|balanced|release`, `--scope path[,path]` and `--since REV` apply to existing modes. Unknown dependency relationships broaden invalidation; a scoped run never claims whole-repository coverage.
+
+`--escalation never|shelve|ask|always` governs upgrades beyond one exact approved execution envelope. New runs default to `shelve`; the host must expose tested route enforcement or the proposal remains shelved. Shelved/denied prerequisites never satisfy ordinary dependencies.
 
 ## Resume and pause
 

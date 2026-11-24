@@ -3,28 +3,87 @@ import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { VERSION, STATE_DIR, now, hash, requireThat, text, relative, repositoryRoot, snapshot, gitState, git, readState, withLock, atomicWrite, mutate, event, repairDeadLock, noSymlinks, fileHash } from './io.mjs';
-import { MODES, coverage, evaluate, runIsFresh, reviewIsFresh, contractHash } from './gates.mjs';
+import { MODES, coverage, evaluate, runIsFresh, reviewIsFresh, reviewAllows, contractHash } from './gates.mjs';
 import { makeTask, validateGraph, leaseWave, selectWave, settleTask, agentFor, tier } from './scheduler.mjs';
+import { DEFAULT_POLICY, normalizePolicy, envelope, proposal, decideEscalation, approve, consumeGrant, emptyBudget, reserve, settleReservation } from './policy.mjs';
 import { checkSpec, checkWaves, executeCheck } from './runner.mjs';
+import { inspectMigration, migrate as migrateLedger, restore as restoreLedger } from './migrations.mjs';
 const ACTIVE = ['active', 'paused', 'blocked'];
 function options(input = {}, base = {}) {
   const parallel = input.parallel ?? base.parallel ?? Math.max(1, Math.min(4, os.availableParallelism?.() ?? os.cpus().length));
   const modelMode = input.modelMode ?? base.modelMode ?? 'auto';
+  const policyBase = base.policy ?? DEFAULT_POLICY;
+  const policy = normalizePolicy({ ...(input.policy ?? {}), profile: input.profile ?? input.policy?.profile ?? base.profile ?? policyBase.profile, escalationMode: input.escalationMode }, policyBase);
+  const rawScope = input.scope ?? base.scope ?? {};
+  const scope = {
+    include: [...(rawScope.include ?? ['.'])].map(p => relative(p, { rootAllowed: true })),
+    exclude: [...(rawScope.exclude ?? [])].map(p => relative(p, { rootAllowed: true })),
+    since: rawScope.since ?? null,
+    includeWorkingTree: rawScope.includeWorkingTree !== false,
+    dependencyMode: rawScope.dependencyMode ?? 'conservative',
+    unknownDependencies: rawScope.unknownDependencies === true,
+  };
+  requireThat(scope.include.length > 0, 'scope.include must be nonempty');
+  requireThat(['conservative', 'known-only'].includes(scope.dependencyMode), 'Invalid scope dependency mode');
   requireThat(Number.isInteger(parallel) && parallel >= 1 && parallel <= 32, 'parallel must be 1..32');
   requireThat(['auto', 'current'].includes(modelMode), 'modelMode must be auto or current');
-  return { parallel, modelMode };
+  return { parallel, modelMode, profile: policy.profile, policy, scope };
 }
 function assertActive(s) { requireThat(s.status === 'active', `Run is ${s.status}; explicitly resume it before changes`, 'RUN_INACTIVE'); }
 function contentInput(paths) { requireThat(Array.isArray(paths) && paths.length > 0, 'paths must be a nonempty array'); return paths.map(x => relative(x)); }
 function actor(v) { return text(v, 'actor', 300); }
 function counts(s) {
   return { findings: Object.fromEntries(['critical', 'high', 'medium', 'low'].map(x => [x, s.findings.filter(f => f.severity === x && !['verified', 'dismissed', 'deferred'].includes(f.status)).length])),
-    tasks: Object.fromEntries(['pending', 'running', 'done', 'blocked', 'deferred'].map(x => [x, s.tasks.filter(t => t.status === x).length])) };
+    tasks: Object.fromEntries(['pending', 'running', 'reconciling', 'done', 'blocked', 'deferred', 'shelved', 'denied', 'cancelled'].map(x => [x, s.tasks.filter(t => t.status === x).length])) };
+}
+function progressFingerprint(s) {
+  return hash({
+    tasks: s.tasks.map(t => [t.id, t.status, t.failedRepairs, t.attempts, t.summary ?? null]),
+    findings: s.findings.map(f => [f.id, f.status, f.planCoverage?.kind ?? null]),
+    checks: s.runs.map(r => [r.checkId, r.status]),
+  });
+}
+function findingKey(input, paths) {
+  return hash({
+    algorithm: 'finding-key-v1',
+    ruleId: input.ruleId ?? null,
+    category: input.category ?? 'correctness',
+    paths: [...paths].sort(),
+    location: input.location ?? null,
+    signature: input.signature ?? null,
+    title: input.title,
+    evidence: input.evidence,
+  });
+}
+function page(items, { cursor, limit = 50 } = {}, snapshotRevision) {
+  requireThat(Number.isInteger(limit) && limit >= 1 && limit <= 200, 'limit must be 1..200');
+  const start = cursor === undefined ? 0 : Number(cursor);
+  requireThat(Number.isInteger(start) && start >= 0 && start <= items.length, 'Invalid pagination cursor');
+  const next = start + limit < items.length ? String(start + limit) : null;
+  return { items: items.slice(start, start + limit), nextCursor: next, totalKnown: items.length, snapshotRevision };
+}
+function recordProgress(s, reason) {
+  s.progress ??= { waves: 0, noProgressWaves: 0, history: [], lastFingerprint: null };
+  const fingerprint = progressFingerprint(s);
+  const changed = fingerprint !== s.progress.lastFingerprint;
+  if (changed) s.progress.noProgressWaves = 0;
+  s.progress.lastFingerprint = fingerprint;
+  s.progress.history.push({ fingerprint, changed, reason, at: now() });
+  const window = s.options.policy?.convergence?.stateHistoryWindow ?? 8;
+  if (s.progress.history.length > window) s.progress.history.splice(0, s.progress.history.length - window);
+  return { fingerprint, changed };
 }
 export class FarEngine {
   constructor(root) { this.root = root; }
   static async open(cwd) { return new FarEngine(await repositoryRoot(cwd)); }
   async state(required = true) { return readState(this.root, required); }
+  async listFindings(input = {}) { const s = await this.state(); return page(s.findings, input, s.revision); }
+  async listTasks(input = {}) { const s = await this.state(); return page(s.tasks, input, s.revision); }
+  async listChecks(input = {}) { const s = await this.state(); return page(s.checks, input, s.revision); }
+  async scopedSnapshot() {
+    const s = await this.state();
+    return snapshot(this.root, 50000, s.options.scope);
+  }
   async start({ mode = 'full', ...input } = {}) {
     requireThat(MODES.includes(mode), `Unknown mode ${mode}`);
     return withLock(this.root, async () => {
@@ -36,10 +95,13 @@ export class FarEngine {
       }
       const entries = await fs.readdir(path.join(this.root, STATE_DIR));
       requireThat(entries.every(e => e === 'write.lock'), 'Refusing to initialize over an unrecognized nonempty .far directory; preserve its contents first', 'STATE_COLLISION');
-      const initial = await snapshot(this.root), baseline = await gitState(this.root);
-      const s = { schemaVersion: 1, version: VERSION, root: this.root, runId: randomUUID(), revision: 1, createdAt: now(), updatedAt: now(),
-        mode, status: 'active', stage: 'feature-freeze', options: options(input), baseline: { ...baseline, snapshot: initial.digest, at: now() },
-        inventory: initial, coverage: {}, boundaries: {}, findings: [], tasks: [], checks: [], runs: [], reviews: [], modelUsage: [], events: [],
+      const runOptions = options(input);
+      const initial = await snapshot(this.root, 50000, runOptions.scope), baseline = await gitState(this.root);
+      const s = { schemaVersion: 2, version: VERSION, root: this.root, runId: randomUUID(), revision: 1, createdAt: now(), updatedAt: now(),
+        mode, status: 'active', lifecycle: 'active', outcome: null, pauseReason: null, stage: 'feature-freeze', options: runOptions,
+        baseline: { ...baseline, snapshot: initial.digest, at: now() }, inventory: initial, coverage: {}, boundaries: {}, findings: [], tasks: [], checks: [], runs: [], reviews: [],
+        escalationRequests: [], approvalGrants: [], budget: emptyBudget(runOptions.policy), dispatch: { intents: [], workers: [] }, idempotency: {},
+        progress: { waves: 0, noProgressWaves: 0, history: [], lastFingerprint: null }, plan: { revision: 0, entries: [] }, modelUsage: [], events: [],
         contract: { sealed: false, revision: 0, note: null }, finalAssessment: null };
       event(s, 'run-started', { mode });
       await atomicWrite(this.root, `${STATE_DIR}/state.json`, s);
@@ -48,28 +110,129 @@ export class FarEngine {
     });
   }
   summary(s) {
-    return { version: VERSION, runId: s.runId, mode: s.mode, status: s.status, stage: s.stage, revision: s.revision, options: s.options,
-      coverage: coverage(s), ...counts(s), contract: s.contract, lastAssessment: s.finalAssessment,
+    return { version: VERSION, runId: s.runId, mode: s.mode, status: s.status, lifecycle: s.lifecycle ?? (s.status === 'complete' ? 'closed' : s.status), outcome: s.outcome ?? null, pauseReason: s.pauseReason ?? null, stage: s.stage, revision: s.revision, options: s.options,
+      coverage: coverage(s), ...counts(s), budget: s.budget ?? null, progress: s.progress ?? null, contract: s.contract, lastAssessment: s.finalAssessment,
       note: 'Coverage/lastAssessment refer to the last recorded snapshot. Use gate or inventory to validate the current working tree.' };
   }
   async status() { const s = await this.state(false); return s ? this.summary(s) : { initialized: false, next: 'Use /far full, or far(action=start, mode=full).' }; }
+  async migration(action = 'inspect', input = {}) {
+    if (action === 'inspect') return inspectMigration(this.root);
+    if (action === 'dry_run') return migrateLedger(this.root, { dryRun: true });
+    if (action === 'apply') return migrateLedger(this.root, { dryRun: false });
+    if (action === 'restore') return restoreLedger(this.root, input.backup);
+    throw new Error(`Unknown migration action ${action}`);
+  }
   async configure(input) { return mutate(this.root, s => { s.options = options(input, s.options); event(s, 'options-changed', s.options); return s.options; }); }
-  async control(action, reason = 'explicit operator request') {
-    requireThat(['pause', 'resume', 'blocked'].includes(action), 'Unknown control action');
+  async setEscalationMode(mode, { trusted = false } = {}) {
+    requireThat(trusted, 'Escalation policy changes require the trusted user control path', 'UNTRUSTED_APPROVAL');
     return mutate(this.root, s => {
-      if (action === 'blocked') requireThat(selectWave(s, { isolation: true }).length === 0 && !s.tasks.some(t => t.status === 'running') && !s.checkBatch, 'Executable or running work remains; finish/settle it before declaring the run blocked');
-      s.status = action === 'resume' ? 'active' : action === 'pause' ? 'paused' : 'blocked';
-      s.finalAssessment = null; event(s, `run-${action}`, { reason: text(reason) }); return this.summary(s);
+      assertActive(s);
+      s.options = options({ escalationMode: mode }, s.options);
+      s.options.policy = { ...s.options.policy, revision: (s.options.policy.revision ?? 1) + 1, source: { kind: 'trusted-user', eventId: randomUUID() } };
+      event(s, 'escalation-policy-changed', { mode, revision: s.options.policy.revision });
+      return s.options.policy;
+    });
+  }
+  async proposeEscalation(input = {}) {
+    return mutate(this.root, s => {
+      assertActive(s);
+      const request = proposal({
+        ...input,
+        runId: s.runId,
+        policyRevision: s.options.policy.revision,
+        scopeFingerprint: input.scopeFingerprint ?? s.inventory.digest,
+        baseline: input.baseline,
+        requested: input.requested,
+      });
+      const decision = decideEscalation({ policy: s.options.policy, proposal: request, host: { enforcement: false } });
+      request.state = decision.state;
+      request.decisionHistory.push({ at: now(), ...decision, source: 'far-engine' });
+      s.escalationRequests.push(request);
+      event(s, 'escalation-proposed', { id: request.digest, state: request.state, decision: decision.decision });
+      return { request, decision };
+    });
+  }
+  async approveEscalation({ requestId, digest, expiresAt = null, limits = {} } = {}, { trusted = false } = {}) {
+    requireThat(trusted, 'Escalation approvals require the trusted user control path', 'UNTRUSTED_APPROVAL');
+    return mutate(this.root, s => {
+      const request = s.escalationRequests.find(r => r.digest === requestId || r.digest === digest);
+      requireThat(request, 'Unknown escalation proposal', 'APPROVAL_UNKNOWN');
+      const grant = approve(request, { source: 'trusted-user', digest: digest ?? request.digest, expiresAt, limits });
+      s.approvalGrants.push(grant); request.state = 'APPROVED'; request.decisionHistory.push({ at: now(), state: 'APPROVED', source: 'trusted-user', grantId: grant.id });
+      event(s, 'escalation-approved', { requestId: request.digest, grantId: grant.id }); return grant;
+    });
+  }
+  async denyEscalation({ requestId, reason = 'explicit trusted denial' } = {}, { trusted = false } = {}) {
+    requireThat(trusted, 'Escalation decisions require the trusted user control path', 'UNTRUSTED_APPROVAL');
+    reason = text(reason, 'denial reason');
+    return mutate(this.root, s => {
+      const request = s.escalationRequests.find(r => r.digest === requestId);
+      requireThat(request, 'Unknown escalation proposal', 'APPROVAL_UNKNOWN');
+      request.state = 'DENIED'; request.decisionHistory.push({ at: now(), state: 'DENIED', reason, source: 'trusted-user' }); event(s, 'escalation-denied', { requestId });
+      return request;
+    });
+  }
+  async reserveEscalation({ requestId, grantId, reservationKey } = {}) {
+    return mutate(this.root, s => {
+      const request = s.escalationRequests.find(r => r.digest === requestId);
+      requireThat(request, 'Unknown escalation proposal', 'APPROVAL_UNKNOWN');
+      const key = reservationKey ?? `D-${request.digest}`;
+      const existing = s.budget.reservations.find(r => r.key === key);
+      if (existing) return { request, reservation: existing, replayed: true };
+      const grant = grantId ? s.approvalGrants.find(g => g.id === grantId) : null;
+      requireThat(grant || request.state === 'APPROVED', 'No approved escalation grant', 'APPROVAL_UNAVAILABLE');
+      if (grant) {
+        const nextGrant = consumeGrant(grant, request.digest);
+        s.approvalGrants = s.approvalGrants.map(g => g.id === grant.id ? nextGrant : g);
+      }
+      const reserved = reserve(s.budget, request.requested, key);
+      s.budget = reserved.budget; request.state = 'DISPATCH_RESERVED';
+      s.dispatch.intents.push({ key, requestId, fencingToken: randomUUID(), at: now(), state: 'RESERVED' });
+      event(s, 'escalation-reserved', { requestId, reservationKey: key });
+      return { request, reservation: reserved.reservation, replayed: reserved.replayed };
+    });
+  }
+  async settleEscalation({ reservationKey, actual, state = 'SETTLED' } = {}) {
+    return mutate(this.root, s => {
+      const settled = settleReservation(s.budget, reservationKey, actual, state);
+      s.budget = settled.budget;
+      const intent = s.dispatch.intents.find(i => i.key === reservationKey);
+      if (intent) intent.state = state;
+      for (const request of s.escalationRequests) if (request.digest === settled.reservation.requestDigest) {
+        request.state = state === 'SETTLED' ? 'SETTLED' : 'RECONCILING';
+      }
+      event(s, 'escalation-settled', { reservationKey, state }); return settled.reservation;
+    });
+  }
+  async control(action, reason = 'explicit operator request') {
+    requireThat(['pause', 'resume', 'blocked', 'cancel'].includes(action), 'Unknown control action');
+    reason = text(reason);
+    return mutate(this.root, s => {
+      if (action === 'pause') {
+        assertActive(s); s.status = 'paused'; s.lifecycle = 'paused'; s.pauseReason = { kind: 'user_pause', reason };
+      } else if (action === 'resume') {
+        requireThat(s.status !== 'complete' && !['CANCELLED', 'BUDGET_EXHAUSTED', 'NON_CONVERGENT'].includes(s.outcome), 'Closed run requires a new explicit run or policy decision', 'RUN_CLOSED');
+        s.status = 'active'; s.lifecycle = 'active'; s.pauseReason = null; s.outcome = null;
+      } else if (action === 'cancel') {
+        requireThat(['active', 'paused'].includes(s.status), `Run is ${s.status}`, 'RUN_INACTIVE');
+        for (const task of s.tasks) if (task.status === 'running') task.cancelRequestedAt = now();
+        s.status = 'blocked'; s.lifecycle = 'closed'; s.outcome = 'CANCELLED'; s.pauseReason = { kind: 'user_cancel', reason };
+      } else {
+        requireThat(selectWave(s, { isolation: true }).length === 0 && !s.tasks.some(t => t.status === 'running') && !s.checkBatch, 'Executable or running work remains; finish/settle it before declaring the run blocked');
+        s.status = 'blocked'; s.lifecycle = 'closed'; s.outcome = 'BLOCKED'; s.pauseReason = { kind: 'blocked', reason };
+      }
+      s.finalAssessment = null; event(s, `run-${action}`, { reason }); return this.summary(s);
     });
   }
   async changeMode(mode, reason) {
     requireThat(MODES.includes(mode), 'Invalid mode'); reason = text(reason, 'scope-change reason');
     return mutate(this.root, s => { requireThat(!s.tasks.some(t => t.status === 'running') && !s.checkBatch, 'Settle running work before a mode change');
-      const before = s.mode; s.mode = mode; s.status = 'active'; s.stage = 'feature-freeze'; s.finalAssessment = null;
+      const before = s.mode; s.mode = mode; s.status = 'active'; s.lifecycle = 'active'; s.outcome = null; s.pauseReason = null; s.stage = 'feature-freeze'; s.finalAssessment = null;
       event(s, 'mode-changed', { before, after: mode, reason }); return this.summary(s); });
   }
   async inventory() {
-    const snap = await snapshot(this.root);
+    const current = await this.state();
+    const snap = await snapshot(this.root, 50000, current.options.scope);
     return mutate(this.root, s => {
       assertActive(s); const previous = new Map(s.inventory.files.map(f => [f.path, f.hash]));
       const changed = snap.files.filter(f => previous.get(f.path) !== f.hash).map(f => f.path);
@@ -90,7 +253,7 @@ export class FarEngine {
   }
   async recordCoverage({ paths, reviewer, evidence, summary }) {
     paths = contentInput(paths); reviewer = actor(reviewer); evidence = text(evidence, 'review evidence'); summary = text(summary, 'review summary');
-    const snap = await snapshot(this.root);
+    const snap = await this.scopedSnapshot();
     return mutate(this.root, s => {
       assertActive(s); requireThat(s.inventory?.digest === snap.digest, 'Source changed since inventory; rescan before recording source reviews', 'STALE_INVENTORY');
       const by = new Map(snap.files.map(f => [f.path, f]));
@@ -109,19 +272,28 @@ export class FarEngine {
     return mutate(this.root, s => {
       assertActive(s);
       const severity = input.severity ?? 'medium', classification = input.classification ?? 'confirmed';
+      const title = text(input.title, 'finding title', 500), paths = contentInput(input.paths), evidence = text(input.evidence, 'finding evidence');
       requireThat(['critical', 'high', 'medium', 'low'].includes(severity), 'Invalid finding severity');
       requireThat(['confirmed', 'suspected', 'debt', 'test-gap', 'documentation', 'opportunity'].includes(classification), 'Invalid finding classification');
-      const f = { id: `F${String(s.findings.length + 1).padStart(4, '0')}`, title: text(input.title, 'finding title', 500), severity, classification,
-        category: text(input.category ?? 'correctness', 'category', 200), paths: contentInput(input.paths), evidence: text(input.evidence, 'finding evidence'),
+      const dedupKey = findingKey({ ...input, title, evidence }, paths);
+      const duplicate = s.findings.find(f => f.dedup?.key === dedupKey);
+      if (duplicate) {
+        duplicate.dedup.aliases.push(input.alias ?? `observation:${now()}`);
+        event(s, 'finding-deduplicated', { id: duplicate.id, key: dedupKey });
+        return { ...duplicate, duplicateOf: duplicate.id };
+      }
+      const f = { id: `F${String(s.findings.length + 1).padStart(4, '0')}`, title, severity, classification,
+        category: text(input.category ?? 'correctness', 'category', 200), paths, evidence,
         impact: text(input.impact, 'impact'), remediation: text(input.remediation, 'remediation'),
-        releaseBlocking: input.releaseBlocking === true || severity === 'critical' || severity === 'high', status: 'open', at: now(), history: [] };
+        releaseBlocking: input.releaseBlocking === true || severity === 'critical' || severity === 'high', status: 'open', planCoverage: null,
+        dedup: { algorithm: 'finding-key-v1', key: dedupKey, aliases: [] }, at: now(), history: [] };
       s.findings.push(f); event(s, 'finding-added', { id: f.id }); return f;
     });
   }
   async updateFinding({ id, status, reason, evidenceIds = [], reviewId, implementer, commits = [] }) {
     requireThat(['open', 'in_progress', 'fixed', 'verified', 'blocked', 'deferred', 'dismissed'].includes(status), 'Invalid finding status');
     reason = text(reason, 'disposition reason');
-    const snap = await snapshot(this.root);
+    const snap = await this.scopedSnapshot();
     return mutate(this.root, async s => {
       assertActive(s); const checked = await this.validatedEvidence(s); const f = s.findings.find(x => x.id === id); requireThat(f, 'Unknown finding');
       if (status === 'deferred') requireThat(!f.releaseBlocking && !['critical', 'high'].includes(f.severity), 'Release blockers cannot be silently deferred');
@@ -129,27 +301,47 @@ export class FarEngine {
       if (status === 'verified') {
         requireThat(f.implementer, 'Record the implementer before verification');
         requireThat(evidenceIds.length > 0 && evidenceIds.every(e => {
-          const r = checked.runs.find(x => x.id === e), c = r && s.checks.find(x => x.id === r.checkId); return c && runIsFresh(r, c, snap);
+          const r = checked.runs.find(x => x.id === e), c = r && s.checks.find(x => x.id === r.checkId);
+          const latest = c && checked.runs.filter(x => x.checkId === c.id && x.specHash === c.specHash && (x.contextKey ?? c.contextKey ?? 'default') === (c.contextKey ?? 'default')).at(-1);
+          return c && latest?.id === r.id && runIsFresh(r, c, snap);
         }), 'Verification requires fresh passing local command evidence', 'STALE_EVIDENCE');
         if (f.releaseBlocking || f.severity === 'high' || f.severity === 'critical') {
           const r = s.reviews.find(x => x.id === reviewId);
-          requireThat(reviewIsFresh(r, snap) && r.reviewer !== f.implementer && (r.findingIds.includes(f.id) || r.scope === 'final'), 'Consequential fix requires a current separate-reviewer record');
+          requireThat(reviewIsFresh(r, snap, s) && reviewAllows(s, snap, r.scope === 'final' ? 'final' : 'batch', f.id) && r.reviewer !== f.implementer && (r.findingIds.includes(f.id) || r.scope === 'final'), 'Consequential fix requires a current separate-reviewer record');
         }
         f.verifiedSnapshot = snap.digest; f.evidenceIds = evidenceIds; f.reviewId = reviewId ?? null;
       }
       if (status === 'dismissed' && f.releaseBlocking) {
         const r = s.reviews.find(x => x.id === reviewId);
-        requireThat(reviewIsFresh(r, snap) && (r.findingIds.includes(f.id) || r.scope === 'final'), 'Dismissing a release blocker requires a current independent review with evidence');
+        requireThat(reviewIsFresh(r, snap, s) && reviewAllows(s, snap, r.scope === 'final' ? 'final' : 'batch', f.id) && (r.findingIds.includes(f.id) || r.scope === 'final'), 'Dismissing a release blocker requires a current independent review with evidence');
         f.dispositionSnapshot = snap.digest; f.reviewId = reviewId;
       }
+      if (['dismissed', 'deferred'].includes(status)) f.planCoverage = { kind: 'disposition', reason, at: now() };
       f.history.push({ at: now(), before: f.status, after: status, reason }); f.status = status; f.reason = reason; f.commits = commits.map(c => text(c, 'commit ref', 100));
       event(s, 'finding-updated', { id, status }); return f;
     });
   }
   async addTasks(inputs) {
     requireThat(Array.isArray(inputs) && inputs.length > 0, 'Need at least one task');
-    return mutate(this.root, s => { assertActive(s); const created = inputs.map((i, n) => makeTask(i, s.tasks.length + n));
-      validateGraph([...s.tasks, ...created]); s.tasks.push(...created); event(s, 'tasks-added', { ids: created.map(t => t.id) }); return created; });
+    return mutate(this.root, s => {
+      assertActive(s);
+      if (s.stage !== 'feature-freeze') {
+        for (const input of inputs) requireThat(['regression', 'release-blocker', 'qualification'].includes(input.admission), 'Only regressions, release blockers, or required qualification work may enter a frozen candidate', 'SCOPE_ADMISSION');
+      }
+      const created = inputs.map((input, n) => {
+        const task = makeTask(input, s.tasks.length + n);
+        const findingIds = input.findingIds ?? [];
+        requireThat(Array.isArray(findingIds) && findingIds.every(id => s.findings.some(f => f.id === id)), 'Unknown finding in task coverage');
+        task.findingIds = [...findingIds];
+        return task;
+      });
+      validateGraph([...s.tasks, ...created]);
+      for (const task of created) for (const id of task.findingIds) {
+        const finding = s.findings.find(f => f.id === id);
+        finding.planCoverage = { kind: 'task', taskIds: [task.id], at: now() };
+      }
+      s.tasks.push(...created); event(s, 'tasks-added', { ids: created.map(t => t.id) }); return created;
+    });
   }
   async seedAudits() {
     return mutate(this.root, s => {
@@ -172,11 +364,57 @@ export class FarEngine {
     });
   }
   async wave({ claim = false, isolation = false, limit } = {}) {
-    if (!claim) { const s = await this.state(); return selectWave(s, { isolation, limit }).map(t => ({ ...t, assignedAgent: agentFor(t), tier: tier(t) })); }
-    return mutate(this.root, s => { assertActive(s); const tasks = leaseWave(s, { isolation, limit });
-      event(s, 'wave-leased', { ids: tasks.map(t => t.id), isolation }); return { tasks, instruction: 'These are reservations, NOT spawned agents. Dispatch with OMP native task using its current schema; settle each lease after inspecting results. Use isolated:true for editing tickets when offered. Integrate patches serially and revalidate the combined tree.' }; });
+    if (!claim) {
+      const s = await this.state();
+      return selectWave(s, { isolation, limit }).map(t => ({ ...t, assignedAgent: agentFor(t), tier: tier(t) }));
+    }
+    return mutate(this.root, s => {
+      assertActive(s);
+      s.progress ??= { waves: 0, noProgressWaves: 0, history: [], lastFingerprint: null };
+      const convergence = s.options.policy?.convergence ?? {};
+      if (s.progress.waves >= (convergence.maxWaves ?? 8)) {
+        s.status = 'blocked'; s.lifecycle = 'closed'; s.outcome = 'BUDGET_EXHAUSTED'; event(s, 'run-stopped', { outcome: s.outcome, reason: 'max-waves' });
+        return { tasks: [], instruction: 'No new dispatch. Run wave budget exhausted; resume only after an explicit policy or scope decision.' };
+      }
+      const tasks = leaseWave(s, { isolation, limit, leaseTimeoutSeconds: s.options.policy?.execution?.workerTimeoutSeconds ?? 1800 });
+      s.progress.waves += 1;
+      if (tasks.length === 0) {
+        s.progress.noProgressWaves += 1;
+        const repeated = s.progress.history.some(h => h.fingerprint === progressFingerprint(s));
+        if (!s.tasks.some(t => t.status === 'running') && (repeated || s.progress.noProgressWaves >= (convergence.maxNoProgressWaves ?? 3))) {
+          s.status = 'blocked'; s.lifecycle = 'closed'; s.outcome = 'NON_CONVERGENT'; event(s, 'run-stopped', { outcome: s.outcome, reason: repeated ? 'repeated-state' : 'no-progress' });
+        }
+      } else {
+        recordProgress(s, 'wave-leased');
+      }
+      event(s, 'wave-leased', { ids: tasks.map(t => t.id), isolation, wave: s.progress.waves });
+      return { tasks, instruction: 'These are reservations, NOT spawned agents. Dispatch with OMP native task using its current schema; settle each lease after inspecting results. Use isolated:true for editing tickets when offered. Integrate patches serially and revalidate the combined tree.' };
+    });
   }
-  async settle(input) { return mutate(this.root, s => { const t = settleTask(s, input); event(s, 'task-settled', { id: t.id, status: t.status }); return t; }); }
+  async settle(input) {
+    return mutate(this.root, s => {
+      s.idempotency ??= {};
+      const key = input.idempotencyKey;
+      if (key && s.idempotency[key]) {
+        requireThat(s.idempotency[key].inputHash === hash(input), 'Idempotency key was reused with different task result', 'IDEMPOTENCY_MISMATCH');
+        return s.idempotency[key].result;
+      }
+      const t = settleTask(s, input);
+      recordProgress(s, 'task-settled');
+      event(s, 'task-settled', { id: t.id, status: t.status });
+      if (key) s.idempotency[key] = { inputHash: hash(input), result: t };
+      return t;
+    });
+  }
+  async reconcileTask({ id, lease, fencing, workerId, state = 'returned', summary = 'Native dispatch reconciliation' } = {}) {
+    return mutate(this.root, s => {
+      const task = s.tasks.find(t => t.id === id);
+      requireThat(task && task.status === 'running' && task.lease === lease && task.fencingGeneration === fencing, 'Stale dispatch result or fencing token', 'FENCE_MISMATCH');
+      if (task.workerId) requireThat(task.workerId === workerId, 'Worker identity changed during reconciliation', 'WORKER_MISMATCH');
+      task.workerId = text(workerId, 'worker id', 300); task.dispatchState = state; task.reconciledAt = now(); task.reconciliationSummary = text(summary, 'reconciliation summary');
+      event(s, 'task-reconciled', { id, workerId: task.workerId, state }); return { ...task };
+    });
+  }
   async reopenTask(id, reason) {
     reason = text(reason, 'new evidence or retry reason');
     return mutate(this.root, s => { const t = s.tasks.find(x => x.id === id); requireThat(t && t.status !== 'running', 'Task missing or still running; settle its lease first');
@@ -200,20 +438,20 @@ export class FarEngine {
   }
   async runChecks(ids, signal) {
     const batchId = randomUUID();
-    const { checks, parallel } = await mutate(this.root, s => {
+    const { checks, parallel, scope } = await mutate(this.root, s => {
       assertActive(s); requireThat(!s.checkBatch, 'Another check batch owns the test environment', 'CHECKS_BUSY');
       requireThat(!s.tasks.some(t => t.status === 'running' && t.writePaths.length && !t.isolated), 'Settle shared-worktree writers before running checks', 'WORKSPACE_BUSY');
       const chosen = ids?.length ? ids.map(id => { const c = s.checks.find(x => x.id === id); requireThat(c, `Unknown check ${id}`); return c; }) : s.checks;
       requireThat(chosen.length > 0 && new Set(chosen.map(c => c.id)).size === chosen.length, 'No checks or duplicate check IDs');
       s.checkBatch = { id: batchId, pid: process.pid, host: os.hostname(), at: now(), ids: chosen.map(x => x.id) };
-      return { checks: chosen, parallel: s.options.parallel };
+      return { checks: chosen, parallel: s.options.parallel, scope: s.options.scope };
     });
     const results = [];
     try {
       for (const group of checkWaves(checks, parallel)) {
         if (signal?.aborted) break;
         const rs = await Promise.all(group.map(async c => {
-          try { return await executeCheck(this.root, c, signal); }
+          try { return await executeCheck(this.root, c, signal, scope); }
           catch (e) { return { id: `E-${randomUUID()}`, checkId: c.id, specHash: c.specHash, status: 'ERROR', error: e.message, at: now(), provenance: 'runner-error' }; }
         }));
         results.push(...rs);
@@ -237,9 +475,9 @@ export class FarEngine {
     requireThat(['batch', 'final'].includes(scope) && ['approve', 'changes_required'].includes(verdict), 'Invalid review scope/verdict');
     reviewer = actor(reviewer); implementer = actor(implementer); requireThat(reviewer !== implementer, 'Reviewer must be a separate actor/context');
     evidence = text(evidence, 'review transcript/artifact reference'); summary = text(summary, 'review summary');
-    const snap = await snapshot(this.root);
+    const snap = await this.scopedSnapshot();
     return mutate(this.root, s => { assertActive(s); requireThat(findingIds.every(id => s.findings.some(f => f.id === id)), 'Unknown reviewed finding');
-      const review = { id: `R${String(s.reviews.length + 1).padStart(4, '0')}`, scope, reviewer, implementer, verdict, evidence, summary, findingIds, snapshot: snap.digest, at: now(), provenance: 'agent-review-attestation' };
+      const review = { id: `R${String(s.reviews.length + 1).padStart(4, '0')}`, scope, reviewer, implementer, verdict, evidence, summary, findingIds, snapshot: snap.digest, contractRevision: s.contract.revision, subjectKey: hash({ scope, snapshot: snap.digest, contractRevision: s.contract.revision, findingIds: [...findingIds].sort() }), at: now(), provenance: 'agent-review-attestation' };
       s.reviews.push(review); event(s, 'review-recorded', { id: review.id, verdict }); return review; });
   }
   async validatedEvidence(s) {
@@ -255,9 +493,9 @@ export class FarEngine {
     }
     return checked;
   }
-  async gates(final = true) { const s = await this.validatedEvidence(await this.state()); return evaluate(s, await snapshot(this.root), { final }); }
+  async gates(final = true) { const s = await this.validatedEvidence(await this.state()); return evaluate(s, await this.scopedSnapshot(), { final }); }
   async advance() {
-    const snap = await snapshot(this.root);
+    const snap = await this.scopedSnapshot();
     return mutate(this.root, async s => {
       assertActive(s); requireThat(!['audit', 'plan'].includes(s.mode), 'Audit/plan modes do not enter release stages');
       const g = evaluate(await this.validatedEvidence(s), snap, { final: false }); requireThat(g.allPassed, `Stage gate failed: ${g.criteria.filter(c => c.status === 'FAIL').map(c => c.id).join(', ')}`, 'GATE_FAILED');
@@ -266,7 +504,7 @@ export class FarEngine {
     });
   }
   async finish() {
-    const snap = await snapshot(this.root);
+    const snap = await this.scopedSnapshot();
     return mutate(this.root, async s => {
       assertActive(s); const g = evaluate(await this.validatedEvidence(s), snap);
       requireThat(g.allPassed, `Cannot finish: ${g.criteria.filter(c => c.status === 'FAIL').map(c => c.id).join(', ')}`, 'GATE_FAILED');
@@ -288,7 +526,7 @@ export class FarEngine {
     return mutate(this.root, s => { const fresh = records.filter(r => !s.modelUsage.some(old => old.observationKey === r.observationKey)); s.modelUsage.push(...fresh); return { recorded: fresh.length }; });
   }
   async report() {
-    const s = await this.validatedEvidence(await this.state()), snap = await snapshot(this.root), g = evaluate(s, snap);
+    const s = await this.validatedEvidence(await this.state()), snap = await this.scopedSnapshot(), g = evaluate(s, snap);
     const esc = v => String(v ?? '').replaceAll('|', '\\|').replaceAll('\n', ' ');
     const header = '<!-- Generated by omp-freeze-audit-remediate; state.json is authoritative. -->\n';
     const reports = {

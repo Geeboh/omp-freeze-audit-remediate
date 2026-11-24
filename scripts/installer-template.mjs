@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
+const PACKAGE_NAME = '__FAR_PACKAGE_NAME__';
 const PAYLOAD = '__FAR_EMBEDDED_PAYLOAD__';
 const sha = b => createHash('sha256').update(b).digest('hex');
 function need(ok, message) { if (!ok) throw new Error(message); }
@@ -18,8 +19,8 @@ async function parentsAreReal(file) {
 }
 async function main() {
   const args = process.argv.slice(2);
-  if(args.length === 1 && ['--help','-h'].includes(args[0])) { console.log('Usage: node omp-freeze-audit-remediate-1.0.0-install.mjs NEW_DESTINATION\nOffline extraction only; no network, provider calls, dependency installation or OMP settings changes. Destination must not exist.'); return; }
-  need(Number(process.versions.node.split('.')[0]) >= 20, 'Node.js 20 or later is required');
+  if(args.length === 1 && ['--help','-h'].includes(args[0])) { console.log(`Usage: node ${PACKAGE_NAME}-install.mjs NEW_DESTINATION\nOffline extraction only; no network, provider calls, dependency installation or OMP settings changes. Destination must not exist.`); return; }
+  need(Number(process.versions.node.split('.')[0]) >= 22, 'Node.js 22 or later is required');
   need(args.length === 1 && !args[0].startsWith('-'), 'Provide exactly one new destination directory; use --help');
   const target = path.resolve(args[0]);
   need(!(await exists(target)), `Destination exists; refusing overwrite: ${target}`);
