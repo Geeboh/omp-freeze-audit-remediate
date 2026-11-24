@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0-rc.1 — 2026-11-25
+## 2.0.0-rc.2 — 2026-11-25
 
 Core overhaul release candidate.
 

@@ -1,6 +1,6 @@
 # OMP Freeze Audit Remediate
 
-**Release candidate 2.0.0-rc.1 · workflow policy v5 · parallel-first · no user testing**
+**Release candidate 2.0.0-rc.2 · workflow policy v5 · parallel-first · no user testing**
 
 An executable Oh My Pi extension for feature freeze, repository-wide audit, bug remediation, pragmatic DRY/KISS cleanup and automated release qualification. It combines a discoverable skill, seven specialist agent definitions, eight model-callable tools, a slash command, a durable local ledger, a conflict-aware scheduler and a real command/evidence runner.
 
@@ -13,15 +13,15 @@ Requires an existing OMP installation, Node.js 22+, Bun 1.4.5+ and Git. The gene
 From the directory containing the distributed single-file installer:
 
 ```bash
-node ./omp-freeze-audit-remediate-2.0.0-rc.1-install.mjs \
-  "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1"
-omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1"
+node ./omp-freeze-audit-remediate-2.0.0-rc.2-install.mjs \
+  "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.2"
+omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.2"
 ```
 
 The installer verifies embedded files, installs or reuses Bun 1.4.5+, refuses an existing destination, and does not change OMP configuration. Missing-Bun installation needs network access and Linux/macOS `unzip`. `omp plugin link` is the explicit separate registration step. Keep the installed directory in place. Start a **new OMP session** to load it.
 The release builder uses `package.json` identity and a tracked allowlist. It writes manifests and receipts only to the output directory. Development checks do not require the source manifest to be current.
 
-Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-2.0.0-rc.1` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
+Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-2.0.0-rc.2` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
 
 ## Recommended full run
 
@@ -146,4 +146,4 @@ npm test
 npm run check
 ```
 
-The tests use temporary repositories and fixtures, not a paid provider. Release candidate `2.0.0-rc.1` uses state schema 2, policy schema 2 and Node.js 22+. Live OMP route enforcement, provider calls, Bun and non-Linux behavior remain unclaimed unless separately qualified.
+The tests use temporary repositories and fixtures, not a paid provider. Release candidate `2.0.0-rc.2` uses state schema 2, policy schema 2 and Node.js 22+. Live OMP route enforcement, provider calls, Bun and non-Linux behavior remain unclaimed unless separately qualified.
