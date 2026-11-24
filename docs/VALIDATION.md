@@ -10,7 +10,7 @@ Validation date: **25 November 2026**. Environment: Linux x86_64, Node.js **24.2
 | Development package checks | **PASS** | Exact final commit `npm run check`; 60 tracked files discovered, 27 JavaScript files syntax-checked, source manifest integrity intentionally not required |
 | Pack integrity | **PASS** | `python3 docs/overhaul/FAR-Overhaul-Pack-v2.0.0/scripts/verify-pack.py --root docs/overhaul/FAR-Overhaul-Pack-v2.0.0`; 56 files and 79/50 contract cases |
 | Pinned source reproductions | **COLLECTED** | Three v1 gate gaps reproduced against d5bba12; safe behavior is covered by `tests/gates-regression.test.mjs` |
-| Release artifact build/installer/rollback | **PASS** | Clean committed candidate built `2.0.0-rc.1`; ZIP and installer validation passed 13 checks; migration restore passed separately; exact receipt and hashes are retained outside source |
+| Release artifact build/installer/rollback | **PASS** | Clean committed candidate built `2.0.0-rc.1`; ZIP and Bun-aware installer validation passed 14 checks; missing-Bun provisioning passed separately; migration restore passed separately; exact receipt and hashes are retained outside source |
 | Live OMP extension/provider smoke | **PASS** | Exact `2.0.0-rc.1` artifact loaded in OMP 19.1.1; `far` help/doctor returned; bounded `openai-codex/gpt-5.6-luna` smoke returned `HOST_SMOKE_OK` in 24.21s with `--max-time 90 --max-cost 1` |
 | Bun and non-Linux behavior | **PARTIAL** | Bun 1.4.5 ran 117/117 tests and package smoke; non-Linux remains NOT_RUN on Linux |
 
