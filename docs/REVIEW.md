@@ -1,6 +1,6 @@
 # Review of prompt v4.0 and implementation decisions
 
-This package implements a reviewed **v4.1 workflow policy**. The plugin's software version is independently **1.0.0**.
+This package implements the bounded FAR core policy. The release candidate is `2.0.0-rc.1`.
 
 ## What was retained
 

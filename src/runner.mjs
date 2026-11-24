@@ -18,7 +18,10 @@ export function checkSpec(input) {
   const resources = (input.resources ?? ['*']).map(x => text(x, 'resource', 200));
   const parallelSafe = input.parallelSafe === true;
   requireThat(!parallelSafe || resources.length > 0 && !resources.includes('*'), 'Parallel-safe checks need explicit resource labels; use a distinct temp DB/build dir/port as appropriate');
-  const spec = { id, title: text(input.title ?? id, 'check title', 500), argv, cwd, timeoutMs, category, required: input.required !== false, parallelSafe, resources };
+  const inputs = (input.inputs ?? ['.']).map(p => relative(p, { rootAllowed: true }));
+  const findingIds = [...new Set(input.findingIds ?? [])];
+  const environment = [...new Set(input.environment ?? ['node', 'platform', 'arch', 'CI', 'NODE_ENV', 'TZ', 'LANG'])];
+  const spec = { id, title: text(input.title ?? id, 'check title', 500), argv, cwd, timeoutMs, category, required: input.required !== false, parallelSafe, resources, inputs, findingIds, environment };
   return { ...spec, specHash: hash(spec) };
 }
 export function checkWaves(checks, parallel) {
@@ -65,21 +68,34 @@ export async function runProcess(argv, { cwd, timeoutMs, signal, limitBytes = 10
     });
   });
 }
+function selectedEnvironment(spec) {
+  const env = childEnvironment();
+  return Object.fromEntries((spec.environment ?? []).map(key => [key, env[key] ?? null]));
+}
+function inputManifest(before, spec) {
+  const files = spec.inputs?.includes('.') ? before.files : before.files.filter(file => spec.inputs?.some(input => file.path === input || file.path.startsWith(`${input}/`)));
+  const environment = selectedEnvironment(spec);
+  return { version: 1, conservative: spec.inputs?.includes('.') ?? true, sourceDigest: before.digest, inputs: spec.inputs ?? ['.'], files: files.map(file => ({ path: file.path, hash: file.hash, kind: file.kind, executable: file.executable })), environment, runtime: { node: process.version, platform: process.platform, arch: process.arch, release: os.release() } };
+}
 export async function executeCheck(root, spec, signal) {
   if (spec.cwd !== '.') await noSymlinks(root, spec.cwd, false);
   const cwd = path.join(root, spec.cwd);
   requireThat((await fs.stat(cwd)).isDirectory(), 'Check cwd is not a directory');
   const before = await snapshot(root);
+  const manifestBefore = inputManifest(before, spec);
   const startedAt = now(), result = await runProcess(spec.argv, { cwd, timeoutMs: spec.timeoutMs, signal });
   const after = await snapshot(root);
+  const manifestAfter = inputManifest(after, spec);
   const id = `E-${randomUUID()}`;
   const log = `.far/evidence/${id}.log`;
   await atomicWrite(root, log, result.output);
   const status = before.digest !== after.digest ? 'CHANGED_DURING_RUN' : result.cancelled ? 'CANCELLED' : result.timedOut ? 'TIMEOUT' : result.exitCode === 0 && !result.error ? 'PASS' : 'FAIL';
   const { output, ...recorded } = result;
+  const contextHash = hash({ specHash: spec.specHash, inputManifest: manifestBefore });
   return { id, checkId: spec.id, specHash: spec.specHash, argv: spec.argv, cwd: spec.cwd, startedAt, finishedAt: now(),
     snapshot: before.digest, afterSnapshot: after.digest, status, ...recorded, log, logHash: hash(output),
+    contextHash, inputManifest: manifestBefore, inputManifestHash: hash(manifestBefore), afterInputManifestHash: hash(manifestAfter),
     environment: { node: process.version, platform: process.platform, arch: process.arch, release: os.release(),
-      removedHarnessVariables: ['NODE_TEST_CONTEXT'], selected: Object.fromEntries(['CI', 'NODE_ENV', 'TZ', 'LANG', 'PYTHONHASHSEED'].map(k => [k, childEnvironment()[k] ?? null])) },
+      removedHarnessVariables: ['NODE_TEST_CONTEXT'], selected: selectedEnvironment(spec) },
     provenance: 'locally-executed-command', assertion: 'Exit status is recorded; test adequacy and semantic correctness require review.' };
 }

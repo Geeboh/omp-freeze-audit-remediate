@@ -1,8 +1,9 @@
 /** A deterministic coordinator-owned DAG scheduler. It plans/leases work, not model calls. */
 import { randomUUID } from 'node:crypto';
 import { requireThat, text, relative, now } from './io.mjs';
+import { dependencyOutcome } from './policy.mjs';
 export const TASK_KINDS = ['audit', 'fix', 'review', 'test', 'document'];
-export const TERMINAL_TASK = new Set(['done', 'deferred']);
+export const TERMINAL_TASK = new Set(['done', 'verified', 'integrated']);
 export function intersects(a, b) {
   return a === '.' || b === '.' || a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
@@ -50,18 +51,27 @@ export function makeTask(input, existingCount) {
   requireThat(!['fix', 'document'].includes(kind) || writePaths.length > 0, 'Editing tasks need explicit writePaths');
   requireThat(!['audit', 'review', 'test'].includes(kind) || writePaths.length === 0, 'Audit/review/test-execution tasks must be read-only; use fix for creating tests');
   requireThat(!writePaths.some(p => p === '.far' || p.startsWith('.far/')), 'Only the coordinator owns FAR state');
+  const rawDependencies = input.dependsOn ?? [];
+  requireThat(Array.isArray(rawDependencies), 'Task dependencies must be an array');
+  const dependsOn = rawDependencies.map(dep => typeof dep === 'string' ? dep : dep?.id);
+  requireThat(dependsOn.every(Boolean), 'Task dependency IDs are required');
+  const dependencyConditions = Object.fromEntries(rawDependencies.map(dep => [typeof dep === 'string' ? dep : dep.id, typeof dep === 'string' ? 'requires_result' : dep.condition ?? 'requires_result']));
   return { id, title: text(input.title, 'task title', 500), instructions: text(input.instructions, 'task instructions'), kind, risk,
-    readPaths, writePaths, dependsOn: input.dependsOn ?? [], resources: (input.resources ?? []).map(x => text(x, 'resource', 200)),
+    readPaths, writePaths, dependsOn, dependencyConditions, resources: (input.resources ?? []).map(x => text(x, 'resource', 200)),
     priority: Number.isFinite(input.priority) ? input.priority : 100, status: 'pending', failedRepairs: 0, attempts: 0,
     createdAt: now(), history: [] };
 }
+export function dependencySatisfied(task, by) {
+  return task.dependsOn.every(id => dependencyOutcome(by.get(id)?.status, task.dependencyConditions?.[id] ?? 'requires_result'));
+}
+
 export function selectWave(s, { isolation = false, limit = s.options.parallel } = {}) {
   requireThat(Number.isInteger(limit) && limit >= 1 && limit <= 32, 'Wave limit must be 1..32');
   validateGraph(s.tasks);
   const active = s.tasks.filter(t => t.status === 'running');
   const available = Math.max(0, Math.min(32, limit, s.options.parallel) - active.length);
   const by = new Map(s.tasks.map(t => [t.id, t]));
-  const pending = s.tasks.filter(t => t.status === 'pending' && t.dependsOn.every(id => TERMINAL_TASK.has(by.get(id)?.status)));
+  const pending = s.tasks.filter(t => t.status === 'pending' && dependencySatisfied(t, by));
   const selected = [];
   for (const t of pending.sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))) {
     if (selected.length >= available) break;
@@ -71,29 +81,36 @@ export function selectWave(s, { isolation = false, limit = s.options.parallel } 
   }
   return selected;
 }
-export function leaseWave(s, opts) {
+
+export function leaseWave(s, opts = {}) {
   const selected = selectWave(s, opts);
   for (const t of selected) {
     t.status = 'running'; t.lease = randomUUID(); t.startedAt = now(); t.attempts += 1;
+    t.fence = (t.fence ?? 0) + 1; t.dispatchKey = `${s.runId ?? 'run'}:${t.id}:${t.attempts}`;
+    t.leaseExpiresAt = new Date(Date.now() + (opts.leaseMs ?? 300000)).toISOString();
     t.isolated = !!opts.isolation && t.writePaths.length > 0;
-    t.assignedAgent = agentFor(t);
+    t.assignedAgent = agentFor(t); t.resultKeys ??= [];
   }
   return selected.map(t => ({ ...t, tier: tier(t) }));
 }
-export function settleTask(s, { id, lease, outcome, summary, infrastructure = false }) {
+
+export function settleTask(s, { id, lease, fence, outcome, summary, infrastructure = false, resultKey = null, nativeWorkerId = null }) {
   const t = s.tasks.find(x => x.id === id);
-  requireThat(t && t.status === 'running' && t.lease === lease, 'Unknown task, stale lease or task not running', 'LEASE_MISMATCH');
-  requireThat(['done', 'failed', 'blocked'].includes(outcome), 'Invalid task outcome');
+  if (resultKey && t?.resultKeys?.includes(resultKey)) return { ...t, idempotent: true, nextTier: tier(t) };
+  requireThat(t && t.status === 'running' && t.lease === lease && (fence == null || t.fence === fence), 'Unknown task, stale lease or task not running', 'LEASE_MISMATCH');
+  requireThat(['done', 'failed', 'blocked', 'deferred', 'shelved', 'denied', 'cancelled'].includes(outcome), 'Invalid task outcome');
   summary = text(summary, 'task result summary');
   const beforeTier = tier(t);
-  t.history.push({ at: now(), outcome, summary, infrastructure, tier: beforeTier, lease });
+  t.history.push({ at: now(), outcome, summary, infrastructure, tier: beforeTier, lease, fence: t.fence, resultKey, nativeWorkerId });
+  if (resultKey) { t.resultKeys ??= []; t.resultKeys.push(resultKey); }
+  if (nativeWorkerId) t.nativeWorkerId = nativeWorkerId;
   if (outcome === 'failed' && !infrastructure) t.failedRepairs += 1;
   if (outcome === 'done') t.status = 'done';
-  else if (outcome === 'blocked' || infrastructure) t.status = 'blocked';
+  else if (['blocked', 'deferred', 'shelved', 'denied', 'cancelled'].includes(outcome) || infrastructure) t.status = outcome === 'failed' ? 'blocked' : outcome;
   else {
     const base = t.risk === 'high' ? 2 : t.risk === 'medium' ? 1 : 0;
     t.status = t.failedRepairs >= (3 - base) * 2 ? 'blocked' : 'pending';
   }
-  t.summary = summary; delete t.lease;
+  t.summary = summary; delete t.lease; delete t.leaseExpiresAt;
   return { ...t, nextTier: tier(t) };
 }

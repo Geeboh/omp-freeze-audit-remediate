@@ -72,3 +72,9 @@ These are engineering decisions for the declared scope, not claims that no bugs 
 ## Other OMP modes and add-ons
 
 Use `/goal` for persistence. A separate `/vibe` workflow is unnecessary: native task workers provide parallelism inside the goal. Prewalk is disabled in the launcher because a one-time first-edit handoff is not a risk-based router. Existing pstack, compaction, RTK-style output compression or repository-indexing plugins are not reconfigured by FAR. Preserve raw failing-command diagnostics/evidence when compressing tool output.
+
+## Scope, profile, and escalation options
+
+Use the existing five modes with `--scope path[,path]`, `--base REV`, and `--profile quick|balanced|release`. Use `--escalation never|shelve|ask|always` to govern execution-envelope upgrades. New runs default to `shelve`.
+
+The ledger records lifecycle, outcome, and readiness separately. A shelved or denied prerequisite remains unresolved. A release-ready result names the current source tree and candidate commit.

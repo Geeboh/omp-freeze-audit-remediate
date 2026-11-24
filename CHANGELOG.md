@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0-rc.1 — 2026-11-24
+
+Core overhaul candidate from the FAR overhaul pack.
+
+- Correct authoritative review and check evidence precedence.
+- Require plan action coverage and keep shelved or denied dependencies unresolved.
+- Add scope, delta-base and profile options with conservative input manifests.
+- Add `never`, `shelve`, `ask` and `always` envelope policy with trusted one-use approvals and transactional budgets.
+- Add finite waves, progress records, fencing, idempotent results, pause/cancel/resume, schema-v1 migration and restore helpers.
+- Add exact finding deduplication, structured pagination and staged release manifests.
+- Separate read-only package checks from artifact manifest integrity.
+
+Live OMP/provider execution remains a separate qualification surface.
+
 ## 1.0.0 — 2026-11-17
 
 First executable package, implementing revised workflow policy v4.1 from the v4 master-prompt review.

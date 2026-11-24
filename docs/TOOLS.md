@@ -99,3 +99,15 @@ node /path/to/plugin/bin/far.mjs request --root /path/to/repo --file request.jso
 ```
 
 The CLI returns JSON and exits nonzero on errors. It never executes a model, recursively calls OMP or interprets slash-command strings.
+
+## Core overhaul actions
+
+The existing eight tools now expose the following additions.
+
+- `far` supports `cancel`, `escalation_status`, `escalation_propose`, `escalation_set`, `shelf_list`, `shelf_show`, `shelf_approve`, `shelf_deny`, `shelf_retry`, `migrate`, and `checkpoint`.
+- `far_tasks` supports `plan`, outcome values `deferred`, `shelved`, `denied`, and `cancelled`, fencing values, result keys, and replay-safe mutation keys.
+- `far_findings`, `far_checks`, and `far_review` accept `cursor` and `limit` and return structured pages when pagination is requested.
+- Checks can declare input paths, finding obligations, and allowlisted nonsecret environment keys.
+- Reviews can declare explicit supersession and resolution links.
+
+New runs use `shelve` for envelope upgrades. Trusted user commands, not model-callable arguments, approve exact immutable proposals. Unknown host enforcement keeps an upgrade shelved.

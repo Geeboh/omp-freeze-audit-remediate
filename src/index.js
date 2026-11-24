@@ -11,8 +11,8 @@ function serializable(v) { try { return JSON.parse(JSON.stringify(v)); } catch {
 function result(data, isError = false) {
   let body = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
   const truncated = body.length > 22000;
-  if (truncated) body = body.slice(0, 22000) + '\n[DISPLAY TRUNCATED. Complete ledger/evidence remain in .far; read targeted ranges. Not all records are shown.]';
-  return { content: [{ type: 'text', text: body }], details: { truncated, value: truncated ? null : data }, ...(isError ? { isError: true } : {}) };
+  if (truncated) body = body.slice(0, 22000) + '\n[DISPLAY TRUNCATED. Machine-readable details.value retains the complete structured result.]';
+  return { content: [{ type: 'text', text: body }], details: { truncated, value: data, omittedCharacters: truncated ? Math.max(0, JSON.stringify(data).length - 22000) : 0 }, ...(isError ? { isError: true } : {}) };
 }
 export async function modelsStatus(ctx, engine) {
   const roleModels = {};
@@ -26,14 +26,31 @@ export async function modelsStatus(ctx, engine) {
 export async function hostDoctor(pi, ctx, engine) {
   const tools = typeof pi.getAllTools === 'function' ? pi.getAllTools() : [];
   const commands = typeof pi.getCommands === 'function' ? pi.getCommands() : [];
+  const task = tools.find(t => t.name === 'task');
+  const taskShape = task?.parameters?.fields ?? task?.parameters ?? null;
+  const hasTaskField = name => taskShape ? Object.prototype.hasOwnProperty.call(taskShape, name) : null;
+  const capability = value => value === true ? 'supported' : value === false ? 'unsupported' : 'unknown';
   return { ...await engine.doctor(), host: {
     runtime: ctx.mode ?? 'unknown', agentIdentity: ctx.agent?.kind ?? 'unavailable',
     registeredFarTools: tools.filter(t => t.name === 'far' || t.name.startsWith('far_')).map(t => t.name),
-    nativeTaskRegistered: tools.some(t => t.name === 'task'), nativeGoalRegistered: tools.some(t => t.name === 'goal'),
-    goalModeControl: typeof ctx.sessionModes?.set === 'function', modelRegistry: typeof ctx.models?.resolve === 'function',
+    capabilities: {
+      goalLifecycle: capability(typeof ctx.sessionModes?.set === 'function'),
+      nativeTask: capability(!!task),
+      taskBatch: capability(hasTaskField('tasks') === true || hasTaskField('batch') === true),
+      isolatedTasks: capability(hasTaskField('isolation') === true),
+      taskIdentity: capability(hasTaskField('id') === true),
+      dispatchHook: 'unknown',
+      exactModelPinning: 'unknown',
+      effortPinning: 'unknown',
+      trustedApprovalOrigin: 'unknown',
+      usageMetadata: 'unknown',
+      cancellation: 'unknown',
+      enforcementSupported: false
+    },
+    registeredTools: tools.map(t => t.name),
     farCommand: commands.some(c => c.name === 'far'),
     skillCommandObserved: commands.some(c => c.name?.includes('freeze-audit-remediate')),
-    instruction: 'The skill is advertised through conventional skills discovery. Inspect native task schema for batch/isolation support; missing registry visibility is UNKNOWN, not proof of absence. This diagnostic does not perform a paid model call.' }, models: await modelsStatus(ctx, engine) };
+    instruction: 'Capabilities are observed from the current injected host only. Unknown task/approval/route hooks block claims of enforced escalation; this diagnostic does not perform a paid model call.' }, models: await modelsStatus(ctx, engine) };
 }
 export default function freezeAuditRemediate(pi) {
   requireThat(pi && typeof pi.registerTool === 'function' && typeof pi.registerCommand === 'function' && typeof pi.on === 'function' && pi.zod, 'FAR requires OMP extension registration and injected pi.zod. See docs/COMPATIBILITY.md.');
@@ -69,7 +86,7 @@ export default function freezeAuditRemediate(pi) {
   const show = (text) => pi.sendMessage({ customType: 'far-output', content: text, display: true, attribution: 'agent' }, { triggerTurn: false });
   pi.registerCommand('far', {
     description: 'Feature freeze, parallel repository audit/remediation and automated verification. /far help; full|audit|plan|remediate|verify|resume; --parallel N --models auto|current.',
-    getArgumentCompletions: prefix => ['full', 'audit', 'plan', 'remediate', 'verify', 'resume', 'status', 'doctor', 'report', 'models', 'pause', 'help'].filter(x => x.startsWith(prefix.trim())).map(value => ({ value, label: value })),
+    getArgumentCompletions: prefix => ['full', 'audit', 'plan', 'remediate', 'verify', 'resume', 'status', 'doctor', 'report', 'models', 'pause', 'cancel', 'escalation', 'shelf', 'help'].filter(x => x.startsWith(prefix.trim())).map(value => ({ value, label: value })),
     handler: async (args, ctx) => {
       try {
         const { command, opts } = parseCommand(args);
@@ -80,19 +97,27 @@ export default function freezeAuditRemediate(pi) {
           const data = command === 'doctor' ? await hostDoctor(pi, ctx, engine) : command === 'models' ? await modelsStatus(ctx, engine) : await engine[command]();
           show(JSON.stringify(data, null, 2)); await progress(ctx, engine); return;
         }
-        if (command === 'pause') {
-          if (ctx.sessionModes?.getState?.().goal?.objective?.startsWith('[FAR]')) {
+        if (['escalation', 'shelf'].includes(command)) {
+          const action = command === 'escalation' ? (opts.subcommand === 'status' ? 'escalation_status' : opts.subcommand === 'set' ? 'escalation_set' : 'escalation_status')
+            : (opts.subcommand === 'list' ? 'shelf_list' : opts.subcommand === 'show' ? 'shelf_show' : opts.subcommand === 'approve' ? 'shelf_approve' : opts.subcommand === 'deny' ? 'shelf_deny' : 'shelf_retry');
+          const data = await invoke(engine, 'far', { action, policy: opts.policy, requestId: opts.id, taskId: opts.id, reason: opts.reason }, { trustedOrigin: 'user-command', trustedActor: ctx.agent?.id ?? 'operator' });
+          show(JSON.stringify(data, null, 2)); await progress(ctx, engine); return;
+        }
+        if (['pause', 'cancel'].includes(command)) {
+          if (command === 'pause' && ctx.sessionModes?.getState?.().goal?.objective?.startsWith('[FAR]')) {
             const paused = await ctx.sessionModes.set({ mode: 'goal', action: 'pause' });
             requireThat(paused.ok, paused.message ?? 'Native goal could not be paused; interrupt the active turn first');
           }
-          await engine.control('pause'); await progress(ctx, engine); show('FAR paused. No automatic reactivation; /far resume continues.'); return;
+          await engine.control(command, command === 'cancel' ? 'explicit user cancellation' : 'explicit user pause');
+          await progress(ctx, engine); show(command === 'cancel' ? 'FAR cancelled. Existing work remains recorded; no automatic reactivation.' : 'FAR paused. No automatic reactivation; /far resume continues.'); return;
         }
         requireThat(MODES.includes(command) || command === 'resume', 'Unknown /far command. Use /far help.');
         requireThat(typeof ctx.isIdle !== 'function' || ctx.isIdle(), 'Interrupt/wait for the current turn before starting a separate FAR workflow');
         let s = await engine.state(false);
         const mode = command === 'resume' ? s?.mode : command;
         requireThat(mode, 'No FAR run exists to resume');
-        const settings = { parallel: opts.parallel ?? s?.options.parallel ?? 4, modelMode: opts.modelMode ?? s?.options.modelMode ?? 'auto' };
+        const settings = { parallel: opts.parallel ?? s?.options.parallel ?? 4, modelMode: opts.modelMode ?? s?.options.modelMode ?? 'auto', profile: opts.profile ?? s?.options.profile ?? 'balanced',
+          scope: { ...(opts.scope ?? s?.scope ?? { paths: ['.'] }), ...(opts.base ? { base: opts.base, explicit: true } : {}) }, escalationPolicy: opts.escalationPolicy };
         // Do not steal another goal, or silently fall back to a one-turn run.
         let goalRequest;
         if (opts.goal) {
@@ -105,7 +130,9 @@ export default function freezeAuditRemediate(pi) {
         else {
           if (s.mode !== mode) await engine.changeMode(mode, `Explicit /far ${mode} command`);
           else await engine.control('resume');
-          await engine.configure(settings);
+          const { escalationPolicy, ...config } = settings;
+          await engine.configure(config);
+          if (escalationPolicy) await engine.setEscalationPolicy(escalationPolicy, { origin: 'user-command', actor: ctx.agent?.id ?? 'operator' });
         }
         if (goalRequest) {
           const entered = await ctx.sessionModes.set(goalRequest);
@@ -147,6 +174,14 @@ export default function freezeAuditRemediate(pi) {
       const selector = modelIdentity(current);
       if (!selector) return { block: true, reason: 'FAR current-model mode cannot resolve the current host model.' };
       return { model: [selector], note: 'FAR current-model mode explicitly pins this worker to the parent model.' };
+    }
+    const approvedModel = s.policy?.envelope?.model;
+    if (approvedModel && event.patterns?.length && typeof ctx.models?.resolve === 'function') {
+      let withinEnvelope = false;
+      for (const pattern of event.patterns) {
+        try { const resolved = modelIdentity(await ctx.models.resolve(pattern)); if (resolved === approvedModel || resolved?.endsWith(`/${approvedModel}`)) withinEnvelope = true; } catch { /* unresolved route remains outside the approved envelope */ }
+      }
+      if (!withinEnvelope) return { block: true, reason: `FAR escalation policy ${s.policy.mode} does not authorize route outside the approved model envelope.` };
     }
     // Preserve native operator overrides. Only use an explicit fallback when the native patterns all fail resolution.
     if (typeof ctx.models?.resolve === 'function' && event.patterns?.length) {

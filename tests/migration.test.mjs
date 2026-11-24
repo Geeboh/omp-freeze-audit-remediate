@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fixture } from './helpers.mjs';
+
+test('schema-v1 migration dry-run is nonmutating and apply preserves identities', async t => {
+  const { engine, dir } = await fixture(t);
+  await engine.start();
+  const current = await engine.state();
+  const legacy = structuredClone(current);
+  legacy.schemaVersion = 1;
+  delete legacy.configSchemaVersion;
+  delete legacy.policySchemaVersion;
+  delete legacy.repositoryId;
+  delete legacy.lifecycle;
+  delete legacy.outcome;
+  delete legacy.pauseReason;
+  delete legacy.readiness;
+  delete legacy.policy;
+  delete legacy.proposals;
+  delete legacy.approvals;
+  delete legacy.budgets;
+  delete legacy.operations;
+  delete legacy.waves;
+  delete legacy.checkpoints;
+  delete legacy.planActions;
+  delete legacy.convergence;
+  delete legacy.scope;
+  delete legacy.release;
+  const stateFile = path.join(dir, '.far/state.json');
+  await fs.writeFile(stateFile, JSON.stringify(legacy, null, 2) + '\n');
+  const before = await fs.readFile(stateFile, 'utf8');
+  const dry = await engine.migrate({ dryRun: true });
+  assert.equal(dry.writes, false);
+  assert.equal(await fs.readFile(stateFile, 'utf8'), before);
+  const applied = await engine.migrate({ dryRun: false });
+  assert.equal(applied.writes, true);
+  const migrated = await engine.state();
+  assert.equal(migrated.schemaVersion, 2);
+  assert.equal(migrated.runId, current.runId);
+});
+
+test('future schema is refused without overwriting state', async t => {
+  const { engine, dir } = await fixture(t);
+  await engine.start();
+  const stateFile = path.join(dir, '.far/state.json');
+  const original = await fs.readFile(stateFile, 'utf8');
+  const future = JSON.parse(original); future.schemaVersion = 99;
+  await fs.writeFile(stateFile, JSON.stringify(future));
+  await assert.rejects(engine.state(), /Unsupported/);
+  assert.deepEqual(JSON.parse(await fs.readFile(stateFile, 'utf8')), future);
+});

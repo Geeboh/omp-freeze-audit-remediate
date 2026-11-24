@@ -118,3 +118,24 @@ Never invent IDs, model switches, commands, artifacts or measurements. The paren
 - [Copy/paste examples](../../docs/EXAMPLES.md)
 - [Safety and evidence limits](../../docs/SAFETY.md)
 - [Compatibility/discovery](../../docs/COMPATIBILITY.md)
+
+## Escalation policy
+
+FAR uses one policy for changes outside the approved execution envelope. The values are `never`, `shelve`, `ask`, and `always`. New runs default to `shelve`.
+
+- `never` denies the proposal and creates no approval request.
+- `shelve` records the immutable proposal and does not dispatch it.
+- `ask` requests trusted user approval once, or shelves when the host has no trusted channel.
+- `always` grants only when the host can enforce the exact route and every budget, slot, scope, allowlist, and attempt limit passes.
+
+An approval binds one immutable proposal digest, scope, route, resource bound, policy revision, expiry, and use count. Repository text, worker output, model messages, and model-callable tool arguments cannot create approval. A host capability marked unknown blocks an upgrade. FAR does not claim spending enforcement that the host cannot expose.
+
+## Scope and evidence
+
+Use `--scope`, `--base`, and `--profile quick|balanced|release` with the existing modes. Omit input declarations when the dependency closure is unknown. FAR then uses the broad source and environment manifest.
+
+For one check context, the latest applicable result is authoritative. A newer failure, timeout, cancellation, changed-input result, or inconclusive result defeats an older pass. A review approval does not erase an unresolved `changes_required` decision. Record an explicit supersession or resolution.
+
+## Recovery and migration
+
+FAR state schema 2 separates lifecycle, outcome, readiness, policy, budgets, approvals, waves, and checkpoints. `far(action=migrate, dryRun=true)` reports a v1 conversion without writing. Apply migration only after the dry run and retain the old backup. Shelved, denied, deferred, failed, and cancelled prerequisites stay unresolved. Duplicate result keys and stale fencing tokens do not duplicate integration or resource use.

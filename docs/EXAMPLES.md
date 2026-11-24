@@ -5,8 +5,8 @@ Run launch commands in an interactive terminal. Replace `/path/to/project` with 
 ## Full freeze with parallel workers
 
 ```bash
-FAR="$HOME/.local/share/omp-freeze-audit-remediate-1.0.0"
-node "$FAR/bin/far.mjs" launch full --root /path/to/project --parallel 4 --models auto
+FAR="$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1"
+node "$FAR/bin/far.mjs" launch full --root /path/to/project --parallel 4 --models auto --profile release --escalation shelve
 ```
 
 The launcher loads the whole package even without a persistent link. It creates an explicit temporary settings overlay with the matching native worker cap, native isolation and no automatic patch application. The coordinator still limits jobs by conflicts and dependencies.

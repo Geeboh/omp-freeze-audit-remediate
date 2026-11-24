@@ -1,6 +1,6 @@
 # OMP Freeze Audit Remediate
 
-**Plugin 1.0.0 · workflow policy v4.1 · parallel-first · no user testing**
+**Plugin 2.0.0-rc.1 · workflow policy v5.0 · bounded and resumable · no user testing**
 
 An executable Oh My Pi extension for feature freeze, repository-wide audit, bug remediation, pragmatic DRY/KISS cleanup and automated release qualification. It combines a discoverable skill, seven specialist agent definitions, eight model-callable tools, a slash command, a durable local ledger, a conflict-aware scheduler and a real command/evidence runner.
 
@@ -8,32 +8,32 @@ An executable Oh My Pi extension for feature freeze, repository-wide audit, bug 
 
 ## Install once
 
-Requires an existing OMP installation, Node.js 20+ and Git. No third-party Node runtime dependencies, API keys or separate MCP service are required by the plugin. Model calls still need your working OMP provider configuration.
+Requires an existing OMP installation, Node.js 22+ and Git. No third-party Node runtime dependencies, API keys or separate MCP service are required by the plugin. Model calls still need your working OMP provider configuration.
 
 From the directory containing the distributed single-file installer:
 
 ```bash
-node ./omp-freeze-audit-remediate-1.0.0-install.mjs \
-  "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0"
-omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0"
+node ./omp-freeze-audit-remediate-2.0.0-rc.1-install.mjs \
+  "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1"
+omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1"
 ```
 
 The installer verifies the embedded files, refuses an existing destination, performs no downloads and does not change OMP configuration. `omp plugin link` is the explicit separate registration step. Keep the installed directory in place. Start a **new OMP session** to load it.
 
-Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-1.0.0` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
+Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-2.0.0-rc.1` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
 
 ## Recommended full run
 
 From an interactive terminal:
 
 ```bash
-node "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0/bin/far.mjs" \
-  launch full --root /path/to/project --parallel 4 --models auto
+node "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1/bin/far.mjs" \
+  launch full --root /path/to/project --parallel 4 --models auto --profile release
 ```
 
 This opens a fresh native OMP goal with YOLO and prewalk disabled, loads the whole package, and supplies a temporary per-run overlay. The overlay enables goal mode, native task batching and isolated workers; it sets native concurrency to the requested number and leaves isolated patches **unapplied** for coordinated integration. It never edits your global or project OMP settings. Host permissions, budgets and provider limits still apply. Run interactively, not through a pipe.
 
-`--parallel 8` allows up to eight nonconflicting jobs; it does not force eight jobs when resources, dependencies or the host prevent it. `--models current` keeps FAR workers on the active parent model. `--dry-run` prints the intended launch without starting OMP or creating workflow state. `--no-overlay` respects an already-configured host without adding the recommended session settings.
+`--parallel 8` allows up to eight nonconflicting jobs. `--models current` keeps FAR workers on the active parent model. `--profile release` enables the strict candidate profile. `--scope src,tests` limits the declared input scope. `--base REV` records a delta baseline. `--escalation shelve` selects the policy for envelope upgrades. `--dry-run` prints the intended launch without starting OMP or creating workflow state. `--no-overlay` respects an already-configured host without adding the recommended session settings.
 
 ### Inside an existing OMP session
 
@@ -41,7 +41,7 @@ After linking, start with the supplied static four-worker overlay:
 
 ```bash
 cd /path/to/project
-omp --config "$HOME/.local/share/omp-freeze-audit-remediate-1.0.0/configs/parallel-safe.yml" --no-prewalk --yolo
+omp --config "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.1/configs/parallel-safe.yml" --no-prewalk --yolo
 ```
 
 Then:
@@ -103,11 +103,13 @@ Independent audits and reviews run concurrently. Editing tasks run concurrently 
 
 Validation commands run concurrently only when explicitly declared parallel-safe with independent resources. Otherwise they serialize. A serial check also forms an ordering barrier. Claiming a task is not spawning a worker; a successful worker exit is not proof its patch is correct.
 
-## Model policy
+## Model and execution policy
 
-Auto mode uses actual configured OMP roles: `@smol` for routine work, `@default` for complex work and `@slow` for consequential work. Agent overrides remain supported. Configure these roles to your available Luna/Sol/Astra choices or other models using OMP's supported settings; the package does not guess provider IDs or change your parent model.
+Auto mode uses actual configured OMP roles: `@smol` for routine work, `@default` for complex work, and `@slow` for consequential work. `current` pins FAR workers to the active parent model. FAR does not guess provider IDs or capability rankings.
 
-Two substantive failed attempts escalate a task; infrastructure failures block rather than burn repair attempts. After bounded deep-tier failures, stop that task pending new evidence. No fixed workload percentages, automatic spending promises or assumed model capability rankings are used. Actual observed native worker metadata is recorded when available; unavailable usage/cost information stays unavailable.
+One policy covers model, provider, effort, fallback, coordinator, reviewer, and ensemble changes outside the approved execution envelope. Values are `never`, `shelve`, `ask`, and `always`. New runs default to `shelve`. Trusted approval binds one exact proposal and one bounded use. Unknown host enforcement shelves the upgrade.
+
+Two substantive failed repairs escalate a task tier. Infrastructure failures block without consuming repair attempts. FAR records unavailable usage and cost as unknown.
 
 ## Evidence, completion and safety
 
@@ -135,9 +137,9 @@ No automatic publishing, production deployment, destructive database operations,
 No dependency installation is needed to run the supplied tests:
 
 ```bash
-cd /path/to/omp-freeze-audit-remediate-1.0.0
+cd /path/to/omp-freeze-audit-remediate-2.0.0-rc.1
 npm test
 npm run check
 ```
 
-The tests use temporary repositories and fixtures, not a paid provider. Package `1.0.0` is the first executable release; `v4.1` labels the revised workflow policy derived from the conversation's v4 prompt.
+The tests use temporary repositories and fixtures, not a paid provider. Package `2.0.0-rc.1` is the release candidate. FAR uses policy `shelve` by default for new-run envelope upgrades. Live host and provider qualification remain separate evidence.

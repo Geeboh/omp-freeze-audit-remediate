@@ -1,10 +1,10 @@
 # Compatibility and primary sources
 
-## Reviewed target, not a live-host certification
+## Current local qualification
 
-Upstream public `main` documentation and TypeScript definitions were inspected on **17 November 2026**. At that retrieval the coding-agent package declared **18.22.0**. `main` is mutable; a commit SHA was not pinned. Compatibility with all earlier/later versions is not asserted.
+The current release candidate is `2.0.0-rc.1`. Local probes observed Linux x86_64, Node.js `24.22.3`, Git `2.43.0`, OMP `19.1.1`, and no Bun executable. The deterministic suite and package checks run on Node 24. A real OMP extension session, native task execution, trusted host approval, and provider execution remain `NOT_RUN`.
 
-Local validation used Node.js 22.16.0 and Git 2.47.3 on Linux. No OMP executable, Bun runtime or authenticated model provider was available in the build environment. Actual OMP startup, package/agent discovery, native task execution, model routing and Bun-specific filesystem/process behavior remain **NOT RUN** here. Tests exercise the adapter against a contract-shaped mock, not the real host. See the exact [validation record](VALIDATION.md).
+The package declares `omp.extensions:["./src/index.js"]`. Link the whole installed directory or load it with `omp --extension`. Start a new OMP session after linking.
 
 ## Discovery contract
 

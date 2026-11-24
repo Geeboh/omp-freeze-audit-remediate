@@ -6,8 +6,9 @@ import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { migrateState, STATE_SCHEMA_VERSION } from './migrations.mjs';
 export const execFileAsync = promisify(execFile);
-export const VERSION = '1.0.0';
+export const VERSION = '2.0.0-rc.1';
 export const STATE_DIR = '.far';
 export const now = () => new Date().toISOString();
 export const hash = value => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
@@ -88,9 +89,12 @@ export async function ensureStateDir(root) {
 export async function readState(root, required = true) {
   await noSymlinks(root, `${STATE_DIR}/state.json`);
   try {
-    const s = JSON.parse(await fs.readFile(path.join(root, STATE_DIR, 'state.json'), 'utf8'));
-    requireThat(s.schemaVersion === 1 && Array.isArray(s.tasks) && Array.isArray(s.findings) && Array.isArray(s.runs) && s.root === root, 'Unsupported, relocated or damaged FAR state; preserve it and inspect before recovery', 'STATE_INVALID');
-    requireThat(['audit', 'plan', 'remediate', 'verify', 'full'].includes(s.mode) && ['active', 'paused', 'blocked', 'complete'].includes(s.status) && ['feature-freeze', 'code-freeze', 'release-candidate'].includes(s.stage) && Number.isInteger(s.revision) && s.options && Number.isInteger(s.options.parallel) && s.options.parallel >= 1 && s.options.parallel <= 32 && ['auto', 'current'].includes(s.options.modelMode) && s.coverage && s.contract && Array.isArray(s.checks) && Array.isArray(s.reviews), 'Invalid FAR ledger fields; preserve state and investigate', 'STATE_INVALID');
+    const raw = JSON.parse(await fs.readFile(path.join(root, STATE_DIR, 'state.json'), 'utf8'));
+    const migrated = raw.schemaVersion === 1 ? migrateState(raw, { targetRoot: root }) : { state: raw, changed: false };
+    const s = migrated.state;
+    requireThat(s.schemaVersion === STATE_SCHEMA_VERSION && Array.isArray(s.tasks) && Array.isArray(s.findings) && Array.isArray(s.runs) && s.root === root, 'Unsupported, relocated or damaged FAR state; preserve it and inspect before recovery', 'STATE_INVALID');
+    requireThat(['audit', 'plan', 'remediate', 'verify', 'full'].includes(s.mode) && ['active', 'paused', 'blocked', 'complete'].includes(s.status) && ['feature-freeze', 'code-freeze', 'release-candidate'].includes(s.stage) && Number.isInteger(s.revision) && s.options && Number.isInteger(s.options.parallel) && s.options.parallel >= 1 && s.options.parallel <= 32 && ['auto', 'current'].includes(s.options.modelMode) && s.coverage && s.contract && Array.isArray(s.checks) && Array.isArray(s.reviews) && s.policy, 'Invalid FAR ledger fields; preserve state and investigate', 'STATE_INVALID');
+    if (migrated.changed) s.__migration = migrated;
     return s;
   } catch (e) { if (e.code === 'ENOENT' && !required) return null; throw e; }
 }
@@ -137,11 +141,28 @@ export async function repairDeadLock(root) {
 export async function mutate(root, fn) {
   return withLock(root, async () => {
     const s = await readState(root);
+    const migration = s.__migration;
+    delete s.__migration;
+    if (migration?.changed) event(s, 'state-migrated', { from: 1, to: STATE_SCHEMA_VERSION, defaulted: migration.defaulted });
     const result = await fn(s);
     s.revision += 1; s.updatedAt = now();
     await atomicWrite(root, `${STATE_DIR}/state.json`, s);
     return result;
   });
+}
+export function operationDigest(input) { return hash(input); }
+export function replayedOperation(s, key, input) {
+  if (!key) return null;
+  const digestValue = operationDigest(input);
+  const prior = s.operations?.[key];
+  if (!prior) return null;
+  requireThat(prior.inputDigest === digestValue, `Idempotency key ${key} was reused with different input`, 'IDEMPOTENCY_MISMATCH');
+  return prior.result;
+}
+export function recordOperation(s, key, input, result) {
+  if (!key) return;
+  s.operations ??= {};
+  s.operations[key] = { inputDigest: operationDigest(input), result: structuredClone(result), revision: s.revision, at: now() };
 }
 export function event(s, kind, data = {}) { s.events.push({ at: now(), kind, ...data }); }
 export function redact(input) {

@@ -18,8 +18,8 @@ async function parentsAreReal(file) {
 }
 async function main() {
   const args = process.argv.slice(2);
-  if(args.length === 1 && ['--help','-h'].includes(args[0])) { console.log('Usage: node omp-freeze-audit-remediate-1.0.0-install.mjs NEW_DESTINATION\nOffline extraction only; no network, provider calls, dependency installation or OMP settings changes. Destination must not exist.'); return; }
-  need(Number(process.versions.node.split('.')[0]) >= 20, 'Node.js 20 or later is required');
+  if(args.length === 1 && ['--help','-h'].includes(args[0])) { console.log('Usage: node __FAR_NAME__-__FAR_VERSION__-install.mjs NEW_DESTINATION\nOffline extraction only; no network, provider calls, dependency installation or OMP settings changes. Destination must not exist.'); return; }
+  need(Number(process.versions.node.split('.')[0]) >= 22, 'Node.js 22 or later is required');
   need(args.length === 1 && !args[0].startsWith('-'), 'Provide exactly one new destination directory; use --help');
   const target = path.resolve(args[0]);
   need(!(await exists(target)), `Destination exists; refusing overwrite: ${target}`);
