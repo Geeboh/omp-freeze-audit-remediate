@@ -1,4 +1,4 @@
-export const HELP = `Freeze Audit Remediate (FAR) 2.1.0-rc.1 — bounded v5 workflow
+export const HELP = `Freeze Audit Remediate (FAR) 2.1.0 — bounded v5 workflow
 
 MODES
   /far audit       Source review and defect register; no product edits.

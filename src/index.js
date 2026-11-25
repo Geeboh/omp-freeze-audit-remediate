@@ -14,15 +14,31 @@ function result(data, isError = false) {
   if (truncated) body = body.slice(0, 22000) + '\n[DISPLAY TRUNCATED. Complete ledger/evidence remain in .far; read targeted ranges. Not all records are shown.]';
   return { content: [{ type: 'text', text: body }], details: { truncated, value: truncated ? null : data }, ...(isError ? { isError: true } : {}) };
 }
-export async function modelsStatus(ctx, engine) {
+export function hostCapabilityReport(ctx, tools = []) {
+  return {
+    goalLifecycle: typeof ctx.sessionModes?.set === 'function' ? 'available' : 'unavailable',
+    nativeTask: tools.some(tool => tool.name === 'task') ? 'registered' : 'unavailable',
+    modelResolution: typeof ctx.models?.resolve === 'function' ? 'available' : 'unavailable',
+    routePinning: typeof ctx.models?.resolve === 'function' ? 'requested-via-pre-spawn-hook-not-verified' : 'unavailable',
+    trustedApprovalOrigin: 'unavailable',
+    dispatchInterception: 'unavailable',
+    perCallLimitEnforcement: 'unavailable',
+    cancellation: 'unknown',
+    usageMetadata: 'observed-task-result-metadata-only',
+    automaticCompactionOwner: 'OMP host',
+    exactEscalationEnforcement: 'unsupported',
+    limitation: 'FAR cannot claim an upgraded route, trusted approval or hard provider budget until the host exposes and FAR verifies those hooks.',
+  };
+}
+export async function modelsStatus(ctx, engine, tools = []) {
   const roleModels = {};
   for (const [tier, role] of Object.entries({ economy: '@smol', standard: '@default', deep: '@slow' })) {
     let m; try { m = await ctx.models?.resolve?.(role); } catch { /* diagnostic only */ }
     roleModels[tier] = { role, resolved: modelIdentity(m), available: !!m };
   }
   const state = await engine.state(false);
-  return { mode: state?.options.modelMode ?? 'auto', current: modelIdentity(await ctx.models?.current?.() ?? ctx.model), roles: roleModels, policy: state?.options.policy ?? null, budget: state?.budget ?? null, hostEnforcement: false,
-    registryAvailable: typeof ctx.models?.resolve === 'function', note: 'Role names are your configuration; no benchmark ranking or price claim. Native operator overrides take precedence in auto mode. Actual execution is recorded only when native task metadata is observed. Escalation upgrades remain shelved unless the host exposes tested exact-route enforcement.' };
+  return { mode: state?.options.modelMode ?? 'auto', current: modelIdentity(await ctx.models?.current?.() ?? ctx.model), roles: roleModels, policy: state?.options.policy ?? null, budget: state?.budget ?? null, hostEnforcement: false, capabilities: hostCapabilityReport(ctx, tools),
+    registryAvailable: typeof ctx.models?.resolve === 'function', note: 'Role names are your configuration; no benchmark ranking or price claim. Native operator overrides take precedence in auto mode. Actual execution is recorded only when native task metadata is observed. Escalation upgrades remain shelved because exact route enforcement and trusted approval origin are unavailable.' };
 }
 export async function hostDoctor(pi, ctx, engine) {
   const tools = typeof pi.getAllTools === 'function' ? pi.getAllTools() : [];
@@ -34,7 +50,7 @@ export async function hostDoctor(pi, ctx, engine) {
     goalModeControl: typeof ctx.sessionModes?.set === 'function', modelRegistry: typeof ctx.models?.resolve === 'function',
     farCommand: commands.some(c => c.name === 'far'),
     skillCommandObserved: commands.some(c => c.name?.includes('freeze-audit-remediate')),
-    instruction: 'The skill is advertised through conventional skills discovery. Inspect native task schema for batch/isolation support; missing registry visibility is UNKNOWN, not proof of absence. This diagnostic does not perform a paid model call.' }, models: await modelsStatus(ctx, engine) };
+    instruction: 'The skill is advertised through conventional skills discovery. Inspect native task schema for batch/isolation support; missing registry visibility is UNKNOWN, not proof of absence. This diagnostic does not perform a paid model call.' }, models: await modelsStatus(ctx, engine, tools) };
 }
 export default function freezeAuditRemediate(pi) {
   requireThat(pi && typeof pi.registerTool === 'function' && typeof pi.registerCommand === 'function' && typeof pi.on === 'function' && pi.zod, 'FAR requires OMP extension registration and injected pi.zod. See docs/COMPATIBILITY.md.');
@@ -59,7 +75,7 @@ export default function freezeAuditRemediate(pi) {
           const engine = await engineFor(ctx);
           let data;
           if (def.name === 'far' && params.action === 'doctor') data = await hostDoctor(pi, ctx, engine);
-          else if (def.name === 'far_models' && params.action === 'status') data = await modelsStatus(ctx, engine);
+          else if (def.name === 'far_models' && params.action === 'status') data = await modelsStatus(ctx, engine, typeof pi.getAllTools === 'function' ? pi.getAllTools() : []);
           else data = await invoke(engine, def.name, params, { signal });
           await progress(ctx, engine);
           return result(data);
@@ -78,7 +94,7 @@ export default function freezeAuditRemediate(pi) {
         requireThat(ctx.agent?.kind !== 'sub', '/far commands run in the coordinator session');
         const engine = await engineFor(ctx);
         if (['status', 'doctor', 'report', 'models'].includes(command)) {
-          const data = command === 'doctor' ? await hostDoctor(pi, ctx, engine) : command === 'models' ? await modelsStatus(ctx, engine) : await engine[command]();
+          const data = command === 'doctor' ? await hostDoctor(pi, ctx, engine) : command === 'models' ? await modelsStatus(ctx, engine, typeof pi.getAllTools === 'function' ? pi.getAllTools() : []) : await engine[command]();
           show(JSON.stringify(data, null, 2)); await progress(ctx, engine); return;
         }
         if (command === 'pause') {

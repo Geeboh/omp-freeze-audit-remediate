@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "claim": "Measure source snapshot cost and whether existing scope selection is sufficient before adding storage/cache infrastructure.",
+  "environment": {"node": "v24.22.3", "platform": "linux", "arch": "x64", "cpus": 16, "loadAverage": [2.27, 2.78, 2.69]},
+  "fixture": {"files": 10000, "samplesPerSide": 5, "alternation": "full, scoped, full, scoped, full, scoped, full, scoped, full, scoped"},
+  "results": {
+    "fullSnapshot": {"medianMs": 1834.571382, "minMs": 1801.956362, "maxMs": 1915.728449, "files": 10000, "bytes": 307780},
+    "scopedSnapshot": {"medianMs": 204.943164, "minMs": 200.334828, "maxMs": 225.591293, "files": 1000, "bytes": 30778}
+  },
+  "decision": "MEASURE_ONLY",
+  "tada": "NOT_RUN"
+}
