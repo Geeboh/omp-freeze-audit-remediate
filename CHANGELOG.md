@@ -1,8 +1,10 @@
 # Changelog
 
-## 2.1.0-rc.1 — 2026-11-25
+## 2.1.0 — 2026-11-25
 
-M7 and M8 follow-through candidate.
+Stable M7/M8 increment.
+
+Stable M7/M8 release.
 
 - Disabled-by-default compact local observations and sanitized versioned exports.
 - Evidence-backed advisory lessons, bounded root-cause groups and structural-assessment tasks.

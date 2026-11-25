@@ -1,6 +1,6 @@
 # OMP Freeze Audit Remediate
 
-**Release candidate 2.1.0-rc.1 · workflow policy v5 · local advisory learning · no user testing**
+**Stable 2.1.0 · workflow policy v5 · local advisory learning · no user testing**
 
 An executable Oh My Pi extension for feature freeze, repository-wide audit, bug remediation, pragmatic DRY/KISS cleanup and automated release qualification. It combines a discoverable skill, seven specialist agent definitions, eight model-callable tools, a slash command, a durable local ledger, a conflict-aware scheduler and a real command/evidence runner.
 
@@ -13,15 +13,15 @@ Requires an existing OMP installation, Node.js 22+, Bun 1.4.5+ and Git. The gene
 From the directory containing the distributed single-file installer:
 
 ```bash
-node ./omp-freeze-audit-remediate-2.1.0-rc.1-install.mjs \
-  "$HOME/.local/share/omp-freeze-audit-remediate-2.1.0-rc.1"
-omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-2.1.0-rc.1"
+node ./omp-freeze-audit-remediate-2.1.0-install.mjs \
+  "$HOME/.local/share/omp-freeze-audit-remediate-2.1.0"
+omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-2.1.0"
 ```
 
 The installer verifies embedded files, installs or reuses Bun 1.4.5+, refuses an existing destination, and does not change OMP configuration. Missing-Bun installation needs network access and Linux/macOS `unzip`. `omp plugin link` is the explicit separate registration step. Keep the installed directory in place. Start a **new OMP session** to load it.
 The release builder uses `package.json` identity and a tracked allowlist. It writes manifests and receipts only to the output directory. Development checks do not require the source manifest to be current.
 
-Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-2.1.0-rc.1` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
+Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-2.1.0` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
 
 ## Recommended full run
 
@@ -146,4 +146,4 @@ npm test
 npm run check
 ```
 
-The tests use temporary repositories and fixtures, not a paid provider. Release candidate `2.1.0-rc.1` adds disabled-by-default local advisory learning and measured M8 decisions to the 2.0.0 core. Live OMP route enforcement, provider calls, Bun and non-Linux behavior remain limited as documented.
+The tests use temporary repositories and fixtures, not a paid provider. Stable `2.1.0` adds disabled-by-default local advisory learning and measured M8 decisions to the 2.0.0 core. Live OMP route enforcement, provider calls, Bun and non-Linux behavior remain limited as documented.
