@@ -11,9 +11,9 @@ Validation date: **25 November 2026**. Environment: Linux x86_64, Node.js **24.2
 | Pack integrity | **PASS** | `python3 docs/overhaul/FAR-Overhaul-Pack-v2.0.0/scripts/verify-pack.py --root docs/overhaul/FAR-Overhaul-Pack-v2.0.0`; 56 files and 79/50 contract cases |
 | Pinned source reproductions | **COLLECTED** | Three v1 gate gaps reproduced against d5bba12; safe behavior is covered by `tests/gates-regression.test.mjs` |
 | M7/M8 local increment | **PASS** | `tests/learning.test.mjs` 3/3; full suite 120/120; M8 measurement has five alternating samples per side on a 1,000-file fixture; no TADA historical run available |
-| Release artifact build/installer/rollback | **NOT_RUN** | Build and exact artifact qualification pending this follow-through candidate |
-| Live OMP extension/provider smoke | **INHERITED / RECHECK** | Core smoke was qualified on the released 2.0.0-rc.2 artifact; M7/M8 artifact smoke is pending |
-| Bun and non-Linux behavior | **PARTIAL / WAIVED** | Bun 1.4.5 ran 117/117 tests and package smoke. User explicitly waived non-Linux qualification for this publication; non-Linux remains NOT_RUN |
+| Release artifact build/installer/rollback | **PASS** | Candidate `2.1.0-rc.1`; Bun-aware installer and release validation passed 14 checks; M7 migration/export tests passed; exact receipt and hashes are retained outside source |
+| Live OMP extension/provider smoke | **PARTIAL / INHERITED** | Exact `2.1.0-rc.1` artifact startup smoke passed on OMP 19.1.1; provider smoke inherited from released core because M7 is local deterministic behavior |
+| Bun and non-Linux behavior | **PARTIAL / WAIVED** | Bun 1.4.5 ran 120/120 tests and package smoke. User explicitly waived non-Linux qualification for this publication; non-Linux remains NOT_RUN |
 
 The suite covers review precedence, latest applicable evidence, plan action coverage, dependency success, escalation policies, exact approvals, reservations, bounded stopping, reconciliation/fencing, pause/cancel/resume, schema migration, scope, deduplication and pagination. Mock extension tests remain host-contract evidence, not live-host qualification.
 
@@ -35,7 +35,7 @@ The release builder additionally uses Python 3's standard library:
 
 ```bash
 python3 scripts/build-release.py /tmp/far-release-output
-node scripts/validate-release.mjs /tmp/far-release-output/omp-freeze-audit-remediate-2.0.0-rc.2-install.mjs
+node scripts/validate-release.mjs /tmp/far-release-output/omp-freeze-audit-remediate-2.1.0-rc.1-install.mjs
 ```
 
 These are package-maintainer automated checks, not a mandatory end-user testing gate. Live host prerequisites remain documented in [Compatibility](COMPATIBILITY.md).

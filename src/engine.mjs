@@ -147,6 +147,7 @@ export class FarEngine {
         event(s, 'learning-lesson-validated', { id: result.lesson.id }); return result.lesson;
       }
       if (action === 'group') {
+        requireThat(Array.isArray(input.findingIds) && input.findingIds.length > 0 && input.findingIds.every(id => s.findings.some(f => f.id === id)), 'Root-cause group references an unknown finding', 'LEARNING_EVIDENCE');
         const result = groupRootCause(s.learning, input); s.learning = result.learning;
         for (const finding of s.findings) if (result.group.findingIds.includes(finding.id)) finding.rootCauseId = result.group.id;
         event(s, 'learning-root-cause-grouped', { id: result.group.id }); return result.group;
@@ -162,8 +163,8 @@ export class FarEngine {
       }
       if (action === 'assessment_task') {
         const findingIds = input.findingIds ?? [];
+        requireThat(findingIds.length > 0 && findingIds.every(id => s.findings.some(f => f.id === id)), 'Structural assessment references an unknown finding', 'LEARNING_EVIDENCE');
         const paths = [...new Set(findingIds.flatMap(id => s.findings.find(f => f.id === id)?.paths ?? []))];
-        requireThat(paths.length > 0, 'Structural assessment needs finding paths', 'LEARNING_EVIDENCE');
         const task = makeTask({ title: input.title ?? 'Bounded structural assessment', instructions: input.instructions ?? 'Assess bounded alternatives and migration risks; do not implement replacement.', kind: 'review', readPaths: paths, findingIds, admission: 'qualification', risk: input.risk ?? 'medium' }, s.tasks.length);
         task.findingIds = [...findingIds]; validateGraph([...s.tasks, task]); s.tasks.push(task);
         for (const finding of s.findings) if (findingIds.includes(finding.id)) finding.planCoverage = { kind: 'task', taskIds: [task.id], at: now() };
