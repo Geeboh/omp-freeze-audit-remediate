@@ -7,7 +7,7 @@ Validation date: **25 November 2026**. Environment: Linux x86_64, Node.js **24.2
 | Validation surface | Result | Evidence and limits |
 |---|---|---|
 | Behavioral suite | **122 passed, 0 failed, 0 skipped** | `npm test`; temporary Git repositories and deterministic policy/recovery fixtures |
-| Development package checks | **PASS** | M7/M8 candidate `npm run check`; 66 tracked files discovered, 30 JavaScript files syntax-checked, source manifest integrity intentionally not required |
+| Development package checks | **PASS** | Stable `npm run check`; 65 tracked files discovered, 30 JavaScript files syntax-checked, source manifest integrity intentionally not required |
 | Pack integrity | **PASS** | `python3 docs/overhaul/FAR-Overhaul-Pack-v2.0.0/scripts/verify-pack.py --root docs/overhaul/FAR-Overhaul-Pack-v2.0.0`; 56 files and 79/50 contract cases |
 | Pinned source reproductions | **COLLECTED** | Three v1 gate gaps reproduced against d5bba12; safe behavior is covered by `tests/gates-regression.test.mjs` |
 | M7/M8 local increment | **PASS** | `tests/learning.test.mjs` 4/4; full suite 122/122; M8 five-sample measurements recorded at 1,000 and 10,000 files; historical TADA run explicitly waived |

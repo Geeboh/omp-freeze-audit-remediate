@@ -21,7 +21,7 @@ omp plugin link "$HOME/.local/share/omp-freeze-audit-remediate-2.1.0"
 The installer verifies embedded files, installs or reuses Bun 1.4.5+, refuses an existing destination, and does not change OMP configuration. Missing-Bun installation needs network access and Linux/macOS `unzip`. `omp plugin link` is the explicit separate registration step. Keep the installed directory in place. Start a **new OMP session** to load it.
 The release builder uses `package.json` identity and a tracked allowlist. It writes manifests and receipts only to the output directory. Development checks do not require the source manifest to be current.
 
-Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-2.1.0` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
+Alternatively extract the ZIP outside the repository being audited and link its `omp-freeze-audit-remediate-2.1.0` directory. Do not copy only `src/index.js`: the package root contains the agents and skill needed for discovery.
 
 ## Recommended full run
 
