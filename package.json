@@ -1,6 +1,6 @@
 {
   "name": "omp-freeze-audit-remediate",
-  "version": "2.0.0-rc.2",
+  "version": "2.1.0-rc.1",
   "description": "Parallel-first, evidence-driven feature freeze, repository audit, bug remediation and automated release verification for Oh My Pi.",
   "type": "module",
   "license": "MIT",

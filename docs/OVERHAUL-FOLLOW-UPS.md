@@ -2,12 +2,21 @@
 
 ## M7 learning and root-cause assistance
 
-1. Add provenance-bearing local observation records for repeated failure signatures.
-2. Test bounded retrieval and export with learning disabled and with cross-project export disabled.
-3. Keep retrieved lessons advisory only. Policy, approvals and release gates remain authoritative.
+Implemented in this increment.
+
+- Local observations are compact, redacted, bounded and disabled by default.
+- Lessons move from proposed to validated only with observation and validation references.
+- Root-cause groups retain original findings and acceptance evidence.
+- Structural assessment tasks are read-only review tasks with bounded paths.
+- Export is versioned JSON, local-only and sanitized.
+- NOESIS remains unavailable because no verified interface is configured. No adapter or upload is enabled.
+
+NOESIS integration is deferred as a future feature. It is not part of this candidate and remains unavailable without a verified interface and explicit sharing scope.
 
 ## M8 evidence-driven optimization
 
-1. Benchmark snapshot hashing, JSON ledger load, pagination and concurrent reservations on 100, 1,000 and 10,000-record fixtures.
-2. Compare p50/p95, RSS, bytes read, lock contention and verified work at concurrency 1, 2 and 4.
-3. Change storage or caching only when paired measurements show a maintained invariant-preserving benefit.
+Implemented in this increment.
+
+- `docs/M8-MEASUREMENT.json` records five alternating samples on a 1,000-file fixture.
+- `docs/M8-DECISION.md` records no SQLite, cache, dashboard or concurrency change.
+- Re-measure at larger fixture sizes before changing the storage or hashing design.

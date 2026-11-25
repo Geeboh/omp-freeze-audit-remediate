@@ -20,6 +20,7 @@ export async function invoke(engine, name, p, { signal, trusted = false } = {}) 
         case 'doctor': return engine.doctor();
         case 'report': return engine.report();
         case 'migrate': return engine.migration(p.migrationAction ?? 'inspect', p);
+        case 'learning': return engine.learning(p.learningAction ?? 'status', p);
         case 'pause': case 'resume': case 'blocked': case 'cancel': return engine.control(p.action, p.reason);
         case 'configure': return engine.configure(p);
         case 'change_mode': return engine.changeMode(p.mode, p.reason);

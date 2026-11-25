@@ -8,6 +8,7 @@ import { makeTask, validateGraph, leaseWave, selectWave, settleTask, agentFor, t
 import { DEFAULT_POLICY, normalizePolicy, envelope, proposal, decideEscalation, approve, consumeGrant, emptyBudget, reserve, settleReservation } from './policy.mjs';
 import { checkSpec, checkWaves, executeCheck } from './runner.mjs';
 import { inspectMigration, migrate as migrateLedger, restore as restoreLedger } from './migrations.mjs';
+import { createLearningState, recordObservation, proposeLesson, validateLesson, groupRootCause, exportLearning } from './learning.mjs';
 const ACTIVE = ['active', 'paused', 'blocked'];
 function options(input = {}, base = {}) {
   const parallel = input.parallel ?? base.parallel ?? Math.max(1, Math.min(4, os.availableParallelism?.() ?? os.cpus().length));
@@ -101,7 +102,7 @@ export class FarEngine {
         mode, status: 'active', lifecycle: 'active', outcome: null, pauseReason: null, stage: 'feature-freeze', options: runOptions,
         baseline: { ...baseline, snapshot: initial.digest, at: now() }, inventory: initial, coverage: {}, boundaries: {}, findings: [], tasks: [], checks: [], runs: [], reviews: [],
         escalationRequests: [], approvalGrants: [], budget: emptyBudget(runOptions.policy), dispatch: { intents: [], workers: [] }, idempotency: {},
-        progress: { waves: 0, noProgressWaves: 0, history: [], lastFingerprint: null }, plan: { revision: 0, entries: [] }, modelUsage: [], events: [],
+        progress: { waves: 0, noProgressWaves: 0, history: [], lastFingerprint: null }, learning: createLearningState(), plan: { revision: 0, entries: [] }, modelUsage: [], events: [],
         contract: { sealed: false, revision: 0, note: null }, finalAssessment: null };
       event(s, 'run-started', { mode });
       await atomicWrite(this.root, `${STATE_DIR}/state.json`, s);
@@ -111,7 +112,7 @@ export class FarEngine {
   }
   summary(s) {
     return { version: VERSION, runId: s.runId, mode: s.mode, status: s.status, lifecycle: s.lifecycle ?? (s.status === 'complete' ? 'closed' : s.status), outcome: s.outcome ?? null, pauseReason: s.pauseReason ?? null, stage: s.stage, revision: s.revision, options: s.options,
-      coverage: coverage(s), ...counts(s), budget: s.budget ?? null, progress: s.progress ?? null, contract: s.contract, lastAssessment: s.finalAssessment,
+      coverage: coverage(s), ...counts(s), budget: s.budget ?? null, progress: s.progress ?? null, learning: s.learning ? { enabled: s.learning.enabled, observations: s.learning.observations.length, lessons: s.learning.lessons.length, rootCauses: s.learning.rootCauses.length, noesis: s.learning.noesis } : null, contract: s.contract, lastAssessment: s.finalAssessment,
       note: 'Coverage/lastAssessment refer to the last recorded snapshot. Use gate or inventory to validate the current working tree.' };
   }
   async status() { const s = await this.state(false); return s ? this.summary(s) : { initialized: false, next: 'Use /far full, or far(action=start, mode=full).' }; }
@@ -121,6 +122,57 @@ export class FarEngine {
     if (action === 'apply') return migrateLedger(this.root, { dryRun: false });
     if (action === 'restore') return restoreLedger(this.root, input.backup);
     throw new Error(`Unknown migration action ${action}`);
+  }
+  async learning(action = 'status', input = {}) {
+    return mutate(this.root, s => {
+      s.learning = createLearningState(s.learning);
+      if (action === 'status') return { ...s.learning, observations: s.learning.observations.length, lessons: s.learning.lessons.length, rootCauses: s.learning.rootCauses.length };
+      if (action === 'configure') {
+        s.learning = createLearningState({ ...s.learning, enabled: input.enabled === true, localOnly: true });
+        event(s, 'learning-configured', { enabled: s.learning.enabled });
+        return { enabled: s.learning.enabled, localOnly: s.learning.localOnly };
+      }
+      if (action === 'observe') {
+        const result = recordObservation(s.learning, input, { runId: s.runId });
+        if (result.recorded) { s.learning = result.learning; event(s, 'learning-observation-recorded', { id: result.observation.id }); }
+        return { recorded: result.recorded, reason: result.reason, observation: result.observation ?? null };
+      }
+      if (action === 'propose') {
+        const result = proposeLesson(s.learning, input); s.learning = result.learning;
+        event(s, 'learning-lesson-proposed', { id: result.lesson.id, duplicateOf: result.duplicateOf ?? null });
+        return result.lesson;
+      }
+      if (action === 'validate') {
+        const result = validateLesson(s.learning, input.id, input.validationRefs); s.learning = result.learning;
+        event(s, 'learning-lesson-validated', { id: result.lesson.id }); return result.lesson;
+      }
+      if (action === 'group') {
+        requireThat(Array.isArray(input.findingIds) && input.findingIds.length > 0 && input.findingIds.every(id => s.findings.some(f => f.id === id)), 'Root-cause group references an unknown finding', 'LEARNING_EVIDENCE');
+        const result = groupRootCause(s.learning, input); s.learning = result.learning;
+        for (const finding of s.findings) if (result.group.findingIds.includes(finding.id)) finding.rootCauseId = result.group.id;
+        event(s, 'learning-root-cause-grouped', { id: result.group.id }); return result.group;
+      }
+      if (action === 'export') {
+        const data = exportLearning(s.learning);
+        const file = '.far/reports/learning-export-v1.json';
+        return atomicWrite(this.root, file, data).then(() => {
+          s.learning.exports = [...s.learning.exports, { file, schemaVersion: 1, at: data.exportedAt }];
+          event(s, 'learning-exported', { file, schemaVersion: 1 });
+          return { file, schemaVersion: 1, observations: data.observations.length, lessons: data.lessons.length, rootCauses: data.rootCauses.length, noesis: data.noesis };
+        });
+      }
+      if (action === 'assessment_task') {
+        const findingIds = input.findingIds ?? [];
+        requireThat(findingIds.length > 0 && findingIds.every(id => s.findings.some(f => f.id === id)), 'Structural assessment references an unknown finding', 'LEARNING_EVIDENCE');
+        const paths = [...new Set(findingIds.flatMap(id => s.findings.find(f => f.id === id)?.paths ?? []))];
+        const task = makeTask({ title: input.title ?? 'Bounded structural assessment', instructions: input.instructions ?? 'Assess bounded alternatives and migration risks; do not implement replacement.', kind: 'review', readPaths: paths, findingIds, admission: 'qualification', risk: input.risk ?? 'medium' }, s.tasks.length);
+        task.findingIds = [...findingIds]; validateGraph([...s.tasks, task]); s.tasks.push(task);
+        for (const finding of s.findings) if (findingIds.includes(finding.id)) finding.planCoverage = { kind: 'task', taskIds: [task.id], at: now() };
+        event(s, 'structural-assessment-task-added', { id: task.id, findingIds }); return task;
+      }
+      if (action === 'noesis_status') return s.learning.noesis;
+      throw new Error(`Unknown learning action ${action}`);
+    });
   }
   async configure(input) { return mutate(this.root, s => { s.options = options(input, s.options); event(s, 'options-changed', s.options); return s.options; }); }
   async setEscalationMode(mode, { trusted = false } = {}) {

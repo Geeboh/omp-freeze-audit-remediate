@@ -1,4 +1,4 @@
-export const HELP = `Freeze Audit Remediate (FAR) 2.0.0-rc.2 — bounded v5 workflow
+export const HELP = `Freeze Audit Remediate (FAR) 2.1.0-rc.1 — bounded v5 workflow
 
 MODES
   /far audit       Source review and defect register; no product edits.
@@ -21,6 +21,7 @@ CONTROL
   /far status | doctor | report | pause | resume | cancel | help
   /far models          Show routing, escalation policy and budgets.
   /far migrate         Inspect schema migration; use explicit apply/restore actions.
+  /far learning        Inspect bounded local advisory learning and export status.
 
 DISCOVERY
   Skill: skill://freeze-audit-remediate

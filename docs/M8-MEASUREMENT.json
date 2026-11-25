@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "claim": "Measure source snapshot cost and whether existing scope selection is sufficient before adding storage/cache infrastructure.",
+  "environment": {
+    "node": "v24.22.3",
+    "platform": "linux",
+    "arch": "x64",
+    "cpus": 16,
+    "loadAverageBefore": [4.39, 3.26, 3.43],
+    "loadAverageRun": [3.17, 3.08, 3.36]
+  },
+  "fixture": {"files": 1000, "samplesPerSide": 5, "alternation": "full, scoped, full, scoped, full, scoped, full, scoped, full, scoped"},
+  "results": {
+    "fullSnapshot": {"medianMs": 203.212079, "minMs": 195.343574, "maxMs": 225.118537, "files": 1000, "bytes": 28780},
+    "scopedSnapshot": {"medianMs": 26.936416, "minMs": 25.130346, "maxMs": 31.085064, "files": 100, "bytes": 2878}
+  },
+  "syscallProfile": "strace -c -f showed the measurement run dominated by runtime futex/epoll activity; source snapshot work contributed statx/openat/read operations. This profile was diagnostic and not used as the primary timing result.",
+  "tada": "NOT_RUN",
+  "decision": "MEASURE_ONLY"
+}

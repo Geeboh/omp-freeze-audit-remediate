@@ -76,7 +76,7 @@ async function main() {
     requireThat(typeof input.tool === 'string' && input.arguments && typeof input.arguments === 'object', 'Request requires tool and arguments');
     output = await invoke(engine, input.tool, input.arguments, { trusted: opts.trusted });
   } else {
-    const actions = { status: ['far', 'status'], doctor: ['far', 'doctor'], inventory: ['far_inventory', 'scan'], seed: ['far_tasks', 'seed'], gate: ['far_gate', 'check'], advance: ['far_gate', 'advance'], finish: ['far_gate', 'finish'], report: ['far', 'report'], migrate: ['far', 'migrate'], resume: ['far', 'resume'], pause: ['far', 'pause'], cancel: ['far', 'cancel'] };
+    const actions = { status: ['far', 'status'], doctor: ['far', 'doctor'], inventory: ['far_inventory', 'scan'], seed: ['far_tasks', 'seed'], gate: ['far_gate', 'check'], advance: ['far_gate', 'advance'], finish: ['far_gate', 'finish'], report: ['far', 'report'], migrate: ['far', 'migrate'], learning: ['far', 'learning'], resume: ['far', 'resume'], pause: ['far', 'pause'], cancel: ['far', 'cancel'] };
     requireThat(actions[opts.cmd], 'Unknown command. Use help.');
     output = await invoke(engine, actions[opts.cmd][0], { action: actions[opts.cmd][1] });
   }

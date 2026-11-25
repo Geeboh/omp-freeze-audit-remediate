@@ -98,6 +98,7 @@ export async function ensureStateDir(root) {
 export async function migrateState(value, root) {
   requireThat(value?.schemaVersion === 1, 'Only FAR schema version 1 can be migrated', 'MIGRATION_UNSUPPORTED');
   const { normalizePolicy, emptyBudget } = await import('./policy.mjs');
+  const { createLearningState } = await import('./learning.mjs');
   const policy = normalizePolicy();
   return {
     ...value,
@@ -113,6 +114,7 @@ export async function migrateState(value, root) {
     dispatch: { intents: [], workers: [] },
     idempotency: {},
     progress: { waves: 0, noProgressWaves: 0, history: [], lastFingerprint: null },
+    learning: createLearningState(),
     plan: { revision: 0, entries: [] },
   };
 }

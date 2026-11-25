@@ -70,7 +70,7 @@ export default function freezeAuditRemediate(pi) {
   const show = (text) => pi.sendMessage({ customType: 'far-output', content: text, display: true, attribution: 'agent' }, { triggerTurn: false });
   pi.registerCommand('far', {
     description: 'Feature freeze, bounded parallel audit/remediation and automated verification. /far help; five modes; --parallel N --models auto|current --profile PROFILE --scope path[,path] --since REV --escalation MODE.',
-    getArgumentCompletions: prefix => ['full', 'audit', 'plan', 'remediate', 'verify', 'resume', 'status', 'doctor', 'report', 'models', 'pause', 'cancel', 'migrate', 'help'].filter(x => x.startsWith(prefix.trim())).map(value => ({ value, label: value })),
+    getArgumentCompletions: prefix => ['full', 'audit', 'plan', 'remediate', 'verify', 'resume', 'status', 'doctor', 'report', 'models', 'pause', 'cancel', 'migrate', 'learning', 'help'].filter(x => x.startsWith(prefix.trim())).map(value => ({ value, label: value })),
     handler: async (args, ctx) => {
       try {
         const { command, opts } = parseCommand(args);
@@ -93,6 +93,9 @@ export default function freezeAuditRemediate(pi) {
         }
         if (command === 'migrate') {
           const data = await engine.migration('inspect'); show(JSON.stringify(data, null, 2)); return;
+        }
+        if (command === 'learning') {
+          const data = await engine.learning('status'); show(JSON.stringify(data, null, 2)); return;
         }
         requireThat(MODES.includes(command) || command === 'resume', 'Unknown /far command. Use /far help.');
         requireThat(typeof ctx.isIdle !== 'function' || ctx.isIdle(), 'Interrupt/wait for the current turn before starting a separate FAR workflow');
