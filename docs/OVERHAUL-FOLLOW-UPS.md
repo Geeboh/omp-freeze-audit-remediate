@@ -11,7 +11,7 @@ Implemented in this increment.
 - Export is versioned JSON, local-only and sanitized.
 - NOESIS remains unavailable because no verified interface is configured. No adapter or upload is enabled.
 
-Next M7 task is to re-evaluate a real verified NOESIS interface if one becomes available. Keep explicit data-sharing scope and do not add a service dependency.
+NOESIS integration is deferred as a future feature. It is not part of this candidate and remains unavailable without a verified interface and explicit sharing scope.
 
 ## M8 evidence-driven optimization
 
