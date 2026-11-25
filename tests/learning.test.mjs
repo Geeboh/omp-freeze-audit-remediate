@@ -15,6 +15,16 @@ test('learning is disabled by default and cannot block a run', async t => {
   const routed = await invoke(engine, 'far', { action: 'learning', learningAction: 'status' });
   assert.equal(routed.enabled, false);
 });
+test('learning rejects unknown finding references and preserves control actions', async t => {
+  const { engine } = await fixture(t);
+  await engine.start();
+  await assert.rejects(engine.learning('group', { findingIds: ['missing'], mechanism: 'unknown' }), /unknown finding/i);
+  await assert.rejects(engine.learning('assessment_task', { findingIds: ['missing'] }), /unknown finding/i);
+  await invoke(engine, 'far', { action: 'pause', reason: 'test pause' });
+  assert.equal((await engine.status()).status, 'paused');
+  await invoke(engine, 'far', { action: 'resume', reason: 'test resume' });
+  assert.equal((await engine.status()).status, 'active');
+});
 test('validated local lessons preserve evidence and do not change policy', async t => {
   const { engine, dir } = await fixture(t);
   await engine.start();
