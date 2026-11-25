@@ -5,7 +5,7 @@
 Start a fresh OMP session with the package and its explicit optional parallel overlay:
 
 ```bash
-node "$HOME/.local/share/omp-freeze-audit-remediate-2.0.0-rc.2/bin/far.mjs" launch full --root /path/to/project --parallel 4 --models auto --profile release --escalation shelve
+node "$HOME/.local/share/omp-freeze-audit-remediate-2.1.0-rc.1/bin/far.mjs" launch full --root /path/to/project --parallel 4 --models auto --profile release --escalation shelve
 ```
 
 This starts native OMP with `--extension`, `--config`, `--no-prewalk`, `--yolo` and `--goal`. The launcher creates no model connection of its own. The parent model follows the installed skill and calls the tools.

@@ -2,7 +2,7 @@
 
 ## Reviewed target and measured host boundary
 
-The overhaul candidate is `2.0.0-rc.2`. The implementation retains the ESM adapter, five modes, eight tools and atomic JSON state. Live capability claims remain separate from deterministic engine evidence.
+The follow-through candidate is `2.1.0-rc.1`. It retains the released ESM adapter, five modes, eight tools and atomic JSON state while adding disabled-by-default local learning and measured M8 decisions.
 
 Local validation used Node.js **24.22.3**, Bun **1.4.5**, Git **2.43.0**, OMP **19.1.1** and Linux x86_64. The installer now provisions Bun 1.4.5+ when absent. Bun ran all 117 tests successfully after the runtime-command normalization. The OMP executable and CLI help are available; extension load and provider smoke are qualified separately, while trusted approval origin, exact route enforcement and non-Linux behavior remain unqualified.
 

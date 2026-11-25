@@ -1,6 +1,13 @@
 # Changelog
 
-## 2.0.0-rc.2 — 2026-11-25
+## 2.1.0-rc.1 — 2026-11-25
+
+M7 and M8 follow-through candidate.
+
+- Disabled-by-default compact local observations and sanitized versioned exports.
+- Evidence-backed advisory lessons, bounded root-cause groups and structural-assessment tasks.
+- Explicit unavailable NOESIS boundary with no upload or service dependency.
+- Fixture measurement and decision record. No SQLite, cache, dashboard or concurrency change.
 
 Core overhaul release candidate.
 

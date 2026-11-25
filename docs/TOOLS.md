@@ -6,10 +6,11 @@ Only the coordinator mutates shared state. Read actions use read approval, ledge
 
 ## far
 
-Actions: `help`, `start`, `status`, `doctor`, `report`, `migrate`, `pause`, `resume`, `blocked`, `cancel`, `configure`, `change_mode`, `prepare_branch`, `repair_lock`.
+Actions: `help`, `start`, `status`, `doctor`, `report`, `migrate`, `learning`, `pause`, `resume`, `blocked`, `cancel`, `configure`, `change_mode`, `prepare_branch`, `repair_lock`.
 
 `start` accepts `mode`, `parallel` (1–32), `modelMode` (`auto`/`current`), `profile` (`quick`/`balanced`/`release`), `scope` and `escalationMode` (`never`/`shelve`/`ask`/`always`). New runs default to `shelve`. `migrate` supports inspect, dry-run, apply and restore through the versioned state boundary.
 `configure` changes run options through the same validators. `change_mode` requires a valid mode and an explicit `reason`; it preserves history and returns to feature-freeze. `blocked` and `cancel` persist terminal outcomes and do not claim owned processes stopped. `prepare_branch` checks for a clean Git working tree (FAR's own state excluded); it does not stash, reset, stage or commit.
+`far learning` exposes bounded local advisory records. Use `learningAction` `status`, `configure`, `observe`, `propose`, `validate`, `group`, `export`, `assessment_task` or `noesis_status`. Learning is disabled by default, never changes policy or gate authority, and exports sanitized versioned JSON. NOESIS remains unavailable unless a verified interface and explicit sharing scope are configured.
 
 ```json
 {"action":"start","mode":"full","parallel":4,"modelMode":"auto"}
